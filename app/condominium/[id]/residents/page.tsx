@@ -8,12 +8,14 @@ import {
   getCondominium,
   getCondominiumRoles,
   verifyRole,
+  deleteCondominiumRole,
 } from "@/lib/services/condominiumService";
 import { getBuildingsByCondominium } from "@/lib/services/buildingService";
 import {
   getUnitsByBuilding,
   verifyUnitOwner,
   rejectUnitClaim,
+  removeUnitOwner,
 } from "@/lib/services/unitService";
 import { getUser } from "@/lib/services/userService";
 import {
@@ -67,6 +69,7 @@ export default function ResidentsPage() {
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<string | null>(null);
+  const [removingUnitId, setRemovingUnitId] = useState<string | null>(null);
   const [validatingPaymentId, setValidatingPaymentId] = useState<string | null>(
     null
   );
@@ -162,6 +165,50 @@ export default function ResidentsPage() {
       alert("Error al rechazar");
     } finally {
       setRejecting(null);
+    }
+  };
+
+  const handleRemoveOwner = async (
+    unitId: string,
+    ownerId: string,
+    roleId: string
+  ) => {
+    const isSelf = ownerId === appUser?.id;
+    const action = isSelf ? "renunciar" : "revocar";
+    if (
+      !window.confirm(
+        `¿${isSelf ? "Renunciar" : "Revocar"} la propiedad de esta unidad?`
+      )
+    )
+      return;
+
+    setRemovingUnitId(unitId);
+    try {
+      await removeUnitOwner(unitId);
+
+      setUnitsByOwner((prev) => {
+        const ownerUnits = prev[ownerId] ?? [];
+        const remaining = ownerUnits.filter((u) => u.id !== unitId);
+        const next = { ...prev };
+        if (remaining.length === 0) {
+          delete next[ownerId];
+        } else {
+          next[ownerId] = remaining;
+        }
+        return next;
+      });
+
+      const remainingCount = (unitsByOwner[ownerId] ?? []).filter(
+        (u) => u.id !== unitId
+      ).length;
+      if (remainingCount === 0) {
+        await deleteCondominiumRole(roleId);
+        setRoles((prev) => prev.filter((r) => r.id !== roleId));
+      }
+    } catch {
+      alert(`Error al ${action} la propiedad`);
+    } finally {
+      setRemovingUnitId(null);
     }
   };
 
@@ -385,6 +432,9 @@ export default function ResidentsPage() {
                           const building = buildings.find(
                             (b) => b.id === u.building
                           );
+                          const canRemove =
+                            isAdminOrManager || r.user === appUser?.id;
+                          const isSelf = r.user === appUser?.id;
                           return (
                             <div
                               key={u.id}
@@ -413,6 +463,21 @@ export default function ResidentsPage() {
                                   ? "Verificado"
                                   : "Pendiente"}
                               </span>
+                              {canRemove && (
+                                <button
+                                  onClick={() =>
+                                    handleRemoveOwner(u.id, r.user, r.id)
+                                  }
+                                  disabled={removingUnitId === u.id}
+                                  className="shrink-0 rounded-full border border-red-300 px-2.5 py-1 text-[10px] font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                                >
+                                  {removingUnitId === u.id
+                                    ? "..."
+                                    : isSelf
+                                      ? "Renunciar"
+                                      : "Revocar"}
+                                </button>
+                              )}
                             </div>
                           );
                         })}

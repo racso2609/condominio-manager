@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  deleteDoc,
   getDoc,
   getDocs,
   query,
@@ -165,6 +166,10 @@ export async function verifyRole(roleId: string): Promise<void> {
     status: "verified",
     updated_at: Timestamp.now(),
   });
+}
+
+export async function deleteCondominiumRole(roleId: string): Promise<void> {
+  await deleteDoc(doc(db, ROLE_COLLECTION, roleId));
 }
 
 export async function updateCondominiumStatus(

@@ -147,6 +147,14 @@ export async function verifyUnitOwner(unitId: string): Promise<void> {
   });
 }
 
+export async function removeUnitOwner(unitId: string): Promise<void> {
+  await updateDoc(doc(db, COLLECTION, unitId), {
+    owner: "",
+    owner_status: deleteField(),
+    updated_at: Timestamp.now(),
+  });
+}
+
 export async function getUnitsByOwner(userId: string): Promise<Unit[]> {
   const snapshot = await getDocs(
     query(collection(db, COLLECTION), where("owner", "==", userId))
