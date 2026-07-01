@@ -469,7 +469,7 @@ export default function ResidentsPage() {
                                     handleRemoveOwner(u.id, r.user, r.id)
                                   }
                                   disabled={removingUnitId === u.id}
-                                  className="shrink-0 rounded-full border border-red-300 px-2.5 py-1 text-[10px] font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                                  className="inline-flex shrink-0 items-center justify-center rounded-full border border-red-300 px-2.5 py-1.5 text-[10px] font-medium leading-none text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
                                 >
                                   {removingUnitId === u.id
                                     ? "..."
