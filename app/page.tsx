@@ -5,14 +5,15 @@ import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/context/authContext";
 
 export default function LoginPage() {
-  const { user, login } = useAuthContext();
+  const { user, login, loading } = useAuthContext();
   const router = useRouter();
 
   useEffect(() => {
-    if (user) router.push("/home");
-  }, [user, router]);
+    if (loading) return;
+    if (user) router.replace("/home");
+  }, [user, loading, router]);
 
-  if (user) return null;
+  if (loading || user) return null;
 
   return (
     <div className="flex flex-1 items-center justify-center bg-zinc-50 dark:bg-black">
