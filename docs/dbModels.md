@@ -13,6 +13,7 @@ condominium:
 - name
 - address
 - creator (FK → user.id)
+- status: "draft" | "complete"
 - created_at
 - updated_at
 

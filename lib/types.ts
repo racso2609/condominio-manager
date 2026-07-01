@@ -15,6 +15,7 @@ export interface Condominium {
   name: string;
   address: string;
   creator: string;
+  status: "draft" | "complete";
   created_at: Timestamp;
   updated_at: Timestamp;
 }
