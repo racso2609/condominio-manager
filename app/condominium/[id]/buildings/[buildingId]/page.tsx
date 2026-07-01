@@ -5,13 +5,15 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
 import { getBuilding, deleteBuilding } from "@/lib/services/buildingService";
-import { Building } from "@/lib/types";
+import { getUnitsByBuilding } from "@/lib/services/unitService";
+import { Building, Unit } from "@/lib/types";
 
 export default function BuildingDetail() {
   const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
   const [building, setBuilding] = useState<Building | null>(null);
+  const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const isAdminOrManager =
@@ -19,9 +21,13 @@ export default function BuildingDetail() {
 
   useEffect(() => {
     if (!params.buildingId) return;
-    getBuilding(params.buildingId as string).then((b) => {
+    const id = params.buildingId as string;
+    Promise.all([getBuilding(id), getUnitsByBuilding(id)]).then(([b, u]) => {
       if (!b) router.replace(`/condominium/${params.id}`);
-      else setBuilding(b);
+      else {
+        setBuilding(b);
+        setUnits(u);
+      }
       setLoading(false);
     });
   }, [params.buildingId, params.id, router]);
@@ -100,11 +106,50 @@ export default function BuildingDetail() {
         )}
       </div>
 
-      <section className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-black">
-        <p className="text-zinc-500 dark:text-zinc-400">
-          Las unidades de este edificio se gestionarán próximamente.
-        </p>
-      </section>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+          Unidades
+        </h2>
+        {isAdminOrManager && (
+          <Link
+            href={`/condominium/${params.id}/buildings/${building.id}/units/new`}
+            className="h-9 rounded-full bg-zinc-900 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+          >
+            Añadir unidad
+          </Link>
+        )}
+      </div>
+
+      {units.length === 0 ? (
+        <section className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-black">
+          <p className="text-zinc-500 dark:text-zinc-400">
+            {isAdminOrManager
+              ? "Usa el botón \"Añadir unidad\" para comenzar a registrar las unidades de este edificio."
+              : "No hay unidades registradas en este edificio."}
+          </p>
+        </section>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {units
+            .sort((a, b) => b.floor - a.floor)
+            .map((u) => (
+              <div
+                key={u.id}
+                className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-white px-5 py-4 shadow-sm dark:border-zinc-800 dark:bg-black"
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100 text-xs font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                  {u.floor}
+                </span>
+                <span className="font-medium text-zinc-900 dark:text-zinc-50">
+                  {u.num}
+                </span>
+                <span className="ml-auto text-xs text-zinc-400">
+                  Piso {u.floor}
+                </span>
+              </div>
+            ))}
+        </div>
+      )}
     </div>
   );
 }
