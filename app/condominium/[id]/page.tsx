@@ -95,9 +95,10 @@ export default function CondominiumDetail() {
       ) : (
         <section className="grid gap-4 sm:grid-cols-2">
           {buildings.map((b) => (
-            <div
+            <Link
               key={b.id}
-              className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-black"
+              href={`/condominium/${params.id}/buildings/${b.id}`}
+              className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-black dark:hover:border-zinc-700"
             >
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 text-sm font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
@@ -114,7 +115,7 @@ export default function CondominiumDetail() {
                   )}
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </section>
       )}
