@@ -71,7 +71,7 @@ export default function GenerateUnits() {
       const actualFloor = fi + fo;
       const nums: string[] = [];
       for (let ui = 0; ui < u; ui++) {
-        nums.push(getUnitNumber(actualFloor, ui, prefix, suffix));
+        nums.push(getUnitNumber(fi, ui, prefix, suffix));
       }
       rows.push({ floor: actualFloor, nums });
     }
