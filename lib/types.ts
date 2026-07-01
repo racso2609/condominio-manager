@@ -4,7 +4,7 @@ export interface AppUser {
   id: string;
   name: string;
   email: string;
-  role: "admin" | "user";
+  role: "admin" | "user" | "administrator";
   photoURL?: string | null;
   created_at: Timestamp;
   updated_at: Timestamp;
@@ -23,7 +23,7 @@ export interface CondominiumRole {
   id: string;
   condominium: string;
   user: string;
-  role: "organizator" | "resident";
+  role: "administrator" | "resident";
   status: "pending" | "verified";
   invited_email?: string;
   invited_by?: string;

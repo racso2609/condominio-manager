@@ -3,7 +3,7 @@ user:
 - id (PK)
 - name
 - email
-- role: admin | user
+- role: admin | user | administrator
 - created_at
 - updated_at
 
@@ -21,7 +21,7 @@ condominium_roles:
 - id (PK)
 - condominium (FK → condominium.id)
 - user (FK → user.id)
-- role: "organizator" | "resident"
+- role: "administrator" | "resident"
 - status: "pending" | "verified"
 - invited_email        -- email the invite was sent to
 - invited_by (FK → user.id)
