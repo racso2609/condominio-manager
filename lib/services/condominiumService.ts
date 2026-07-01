@@ -66,6 +66,16 @@ export async function createCondominium(data: {
     updated_at: now,
   };
   await setDoc(ref, condoData);
+
+  await setDoc(doc(collection(db, ROLE_COLLECTION)), {
+    condominium: ref.id,
+    user: data.creator,
+    role: "administrator",
+    status: "verified",
+    created_at: now,
+    updated_at: now,
+  });
+
   return { id: ref.id, ...condoData };
 }
 
