@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
 import { getBuilding, deleteBuilding } from "@/lib/services/buildingService";
-import { getUnitsByBuilding, deleteUnit } from "@/lib/services/unitService";
+import {
+  getUnitsByBuilding,
+  deleteUnit,
+  updateUnitType,
+} from "@/lib/services/unitService";
 import { Building, Unit } from "@/lib/types";
 
 export default function BuildingDetail() {
@@ -16,6 +20,8 @@ export default function BuildingDetail() {
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [processing, setProcessing] = useState(false);
   const isAdminOrManager =
     appUser?.role === "admin" || appUser?.role === "administrator";
 
@@ -32,8 +38,54 @@ export default function BuildingDetail() {
     });
   }, [params.buildingId, params.id, router]);
 
+  const toggleUnit = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = useCallback(() => {
+    if (selected.size === units.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(units.map((u) => u.id)));
+    }
+  }, [selected.size, units]);
+
+  const clearSelection = () => setSelected(new Set());
+
+  const bulkDelete = async () => {
+    if (
+      !window.confirm(`¿Eliminar ${selected.size} unidades seleccionadas?`)
+    )
+      return;
+    setProcessing(true);
+    await Promise.all([...selected].map((id) => deleteUnit(id)));
+    setUnits((prev) => prev.filter((u) => !selected.has(u.id)));
+    setSelected(new Set());
+    setProcessing(false);
+  };
+
+  const bulkSetType = async (type: "residential" | "office") => {
+    setProcessing(true);
+    await Promise.all([...selected].map((id) => updateUnitType(id, type)));
+    setUnits((prev) =>
+      prev.map((u) => (selected.has(u.id) ? { ...u, type } : u))
+    );
+    setSelected(new Set());
+    setProcessing(false);
+  };
+
   const handleDeleteBuilding = async () => {
-    if (!window.confirm("¿Eliminar este edificio? Esta acción no se puede deshacer.")) return;
+    if (
+      !window.confirm(
+        "¿Eliminar este edificio? Esta acción no se puede deshacer."
+      )
+    )
+      return;
     setDeleting(true);
     try {
       await deleteBuilding(params.buildingId as string);
@@ -114,9 +166,9 @@ export default function BuildingDetail() {
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Unidades
+          Unidades {units.length > 0 && `(${units.length})`}
         </h2>
-        {isAdminOrManager && (
+        {isAdminOrManager && units.length === 0 && (
           <Link
             href={`/condominium/${params.id}/buildings/${building.id}/units/new`}
             className="h-9 rounded-full bg-zinc-900 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
@@ -126,23 +178,88 @@ export default function BuildingDetail() {
         )}
       </div>
 
+      {selected.size > 0 && isAdminOrManager && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-700 dark:bg-zinc-900">
+          <span className="text-sm text-zinc-600 dark:text-zinc-400">
+            {selected.size} seleccionadas
+          </span>
+          <div className="ml-auto flex flex-wrap gap-2">
+            <button
+              onClick={() => bulkSetType("residential")}
+              disabled={processing}
+              className="h-8 rounded-full border border-zinc-300 px-4 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              Habitacional
+            </button>
+            <button
+              onClick={() => bulkSetType("office")}
+              disabled={processing}
+              className="h-8 rounded-full border border-zinc-300 px-4 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              Oficina
+            </button>
+            <button
+              onClick={bulkDelete}
+              disabled={processing}
+              className="h-8 rounded-full border border-red-200 px-4 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-900/20"
+            >
+              Eliminar
+            </button>
+            <button
+              onClick={clearSelection}
+              disabled={processing}
+              className="h-8 rounded-full border border-zinc-200 px-4 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       {units.length === 0 ? (
         <section className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-black">
           <p className="text-zinc-500 dark:text-zinc-400">
             {isAdminOrManager
-              ? "Usa el botón \"Generar unidades\" para crearlas automáticamente."
+              ? 'Usa el botón "Generar unidades" para crearlas automáticamente.'
               : "No hay unidades registradas en este edificio."}
           </p>
         </section>
       ) : (
         <div className="flex flex-col gap-3">
+          {isAdminOrManager && units.length > 0 && (
+            <label className="flex cursor-pointer items-center gap-3 px-1 py-1">
+              <input
+                type="checkbox"
+                checked={selected.size === units.length}
+                onChange={toggleAll}
+                className="accent-zinc-900 dark:accent-zinc-50"
+              />
+              <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                {selected.size === units.length
+                  ? "Deseleccionar todas"
+                  : "Seleccionar todas"}
+              </span>
+            </label>
+          )}
           {units
             .sort((a, b) => b.floor - a.floor)
             .map((u) => (
               <div
                 key={u.id}
-                className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-white px-5 py-4 shadow-sm dark:border-zinc-800 dark:bg-black"
+                className={`flex items-center gap-4 rounded-xl border bg-white px-5 py-4 shadow-sm transition-colors dark:bg-black ${
+                  selected.has(u.id)
+                    ? "border-zinc-900 dark:border-zinc-50"
+                    : "border-zinc-200 dark:border-zinc-800"
+                }`}
               >
+                {isAdminOrManager && (
+                  <input
+                    type="checkbox"
+                    checked={selected.has(u.id)}
+                    onChange={() => toggleUnit(u.id)}
+                    className="accent-zinc-900 dark:accent-zinc-50"
+                  />
+                )}
                 <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100 text-xs font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
                   {u.floor}
                 </span>
@@ -158,10 +275,8 @@ export default function BuildingDetail() {
                 >
                   {u.type === "residential" ? "Hab." : "Ofi."}
                 </span>
-                <span className="text-xs text-zinc-400">
-                  Piso {u.floor}
-                </span>
-                {isAdminOrManager && (
+                <span className="text-xs text-zinc-400">Piso {u.floor}</span>
+                {isAdminOrManager && !selected.has(u.id) && (
                   <button
                     onClick={() => handleDeleteUnit(u.id, u.num)}
                     className="ml-auto text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
