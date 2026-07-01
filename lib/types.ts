@@ -71,11 +71,18 @@ export interface Expense {
   updated_at: Timestamp;
 }
 
+export interface AnnouncementFile {
+  name: string;
+  url: string;
+  type: "image" | "document";
+}
+
 export interface Announcement {
   id: string;
   condominium: string;
   title: string;
   content: string;
+  files?: AnnouncementFile[];
   author: string;
   created_at: Timestamp;
   updated_at: Timestamp;

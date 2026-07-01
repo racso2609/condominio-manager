@@ -4,44 +4,50 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
 import { getUserCondominiums, getPendingInvitesByEmail } from "@/lib/services/condominiumService";
-import { updateUser } from "@/lib/services/userService";
-import { Condominium, CondominiumRole } from "@/lib/types";
+import { getAnnouncementsByCondominium } from "@/lib/services/announcementService";
+import { getUser } from "@/lib/services/userService";
+import { Condominium, CondominiumRole, Announcement, AppUser } from "@/lib/types";
 
 export default function Home() {
   const { user, appUser, logout } = useAuthContext();
   const [condominiums, setCondominiums] = useState<Condominium[]>([]);
   const [pendingInvites, setPendingInvites] = useState<CondominiumRole[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [announcementAuthors, setAnnouncementAuthors] = useState<
+    Record<string, AppUser>
+  >({});
   const [loading, setLoading] = useState(true);
-  const [phone, setPhone] = useState("");
-  const [savingPhone, setSavingPhone] = useState(false);
 
   useEffect(() => {
     if (!appUser) return;
     Promise.all([
       getUserCondominiums(appUser.id, appUser.role),
       getPendingInvitesByEmail(appUser.email),
-    ]).then(([list, invites]) => {
+    ]).then(async ([list, invites]) => {
       setCondominiums(list);
       setPendingInvites(invites);
+
+      const allAnnouncements: Announcement[] = [];
+      const authorIds = new Set<string>();
+      for (const c of list) {
+        const anns = await getAnnouncementsByCondominium(c.id);
+        allAnnouncements.push(...anns);
+        anns.forEach((a) => authorIds.add(a.author));
+      }
+      allAnnouncements.sort(
+        (a, b) => b.created_at.toMillis() - a.created_at.toMillis()
+      );
+      setAnnouncements(allAnnouncements.slice(0, 10));
+
+      const map: Record<string, AppUser> = {};
+      for (const uid of authorIds) {
+        const u = await getUser(uid);
+        if (u) map[uid] = u;
+      }
+      setAnnouncementAuthors(map);
       setLoading(false);
     });
   }, [appUser]);
-
-  useEffect(() => {
-    if (appUser?.phone) setPhone(appUser.phone);
-  }, [appUser]);
-
-  const handleSavePhone = async () => {
-    if (!appUser) return;
-    setSavingPhone(true);
-    try {
-      await updateUser(appUser.id, { phone });
-    } catch {
-      alert("Error al guardar teléfono");
-    } finally {
-      setSavingPhone(false);
-    }
-  };
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-8">
@@ -56,7 +62,7 @@ export default function Home() {
               />
               <div>
                 <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                  {user.displayName}
+                  {appUser?.name ?? user.displayName}
                 </p>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
                   {appUser?.role === "admin"
@@ -70,40 +76,21 @@ export default function Home() {
           )}
         </div>
 
-        <button
-          onClick={logout}
-          className="h-9 rounded-full border border-zinc-200 px-5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
-        >
-          Cerrar sesión
-        </button>
+        <div className="flex gap-2">
+          <Link
+            href="/profile"
+            className="h-9 rounded-full border border-zinc-200 px-5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          >
+            Perfil
+          </Link>
+          <button
+            onClick={logout}
+            className="h-9 rounded-full border border-zinc-200 px-5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          >
+            Cerrar sesión
+          </button>
+        </div>
       </header>
-
-      {appUser && !appUser.phone && (
-        <section className="rounded-xl border border-sky-200 bg-sky-50 p-5 dark:border-sky-900 dark:bg-sky-900/20">
-          <p className="text-sm font-medium text-sky-800 dark:text-sky-300">
-            Completa tu información de contacto
-          </p>
-          <p className="mt-1 text-xs text-sky-600 dark:text-sky-400">
-            Los administradores necesitarán tu teléfono para contactarte.
-          </p>
-          <div className="mt-3 flex gap-2">
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+58 412 123 4567"
-              className="flex-1 rounded-xl border border-sky-300 bg-white px-4 py-2 text-sm text-zinc-900 placeholder-zinc-400 outline-none focus:border-sky-500 dark:border-sky-700 dark:bg-black dark:text-zinc-50 dark:placeholder-zinc-500"
-            />
-            <button
-              onClick={handleSavePhone}
-              disabled={savingPhone || !phone.trim()}
-              className="h-10 rounded-full bg-sky-600 px-5 text-sm font-medium text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
-            >
-              {savingPhone ? "Guardando..." : "Guardar"}
-            </button>
-          </div>
-        </section>
-      )}
 
       <div>
         <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
@@ -141,6 +128,50 @@ export default function Home() {
                 </Link>
               </div>
             ))}
+          </div>
+        </section>
+      )}
+
+      {!loading && announcements.length > 0 && (
+        <section>
+          <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+            Últimas noticias
+          </h2>
+          <div className="flex flex-col gap-3">
+            {announcements.map((ann) => {
+              const author = announcementAuthors[ann.author];
+              const images =
+                ann.files?.filter((f) => f.type === "image") ?? [];
+              return (
+                <Link
+                  key={ann.id}
+                  href={`/condominium/${ann.condominium}/announcements`}
+                  className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-black dark:hover:border-zinc-700"
+                >
+                  <div className="flex gap-4">
+                    {images.length > 0 && (
+                      <img
+                        src={images[0].url}
+                        alt=""
+                        className="h-16 w-24 shrink-0 rounded-lg object-cover"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                        {ann.title}
+                      </h3>
+                      <p className="mt-1 line-clamp-2 text-xs text-zinc-500">
+                        {ann.content}
+                      </p>
+                      <p className="mt-1.5 text-[10px] text-zinc-400">
+                        {author?.name ?? ""} ·{" "}
+                        {ann.created_at.toDate().toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </section>
       )}

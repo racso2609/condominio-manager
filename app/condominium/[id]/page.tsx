@@ -138,16 +138,22 @@ export default function CondominiumDetail() {
       </div>
 
       {isAdminOrManager && (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/condominium/${condominium.id}/announcements`}
+            className="flex h-9 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          >
+            Anuncios
+          </Link>
           <Link
             href={`/condominium/${condominium.id}/invite`}
-            className="h-9 rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            className="flex h-9 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
           >
             Invitar residentes
           </Link>
           <Link
             href={`/condominium/${condominium.id}/residents`}
-            className="h-9 rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            className="flex h-9 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
           >
             Gestionar residentes
           </Link>
