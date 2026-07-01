@@ -17,6 +17,7 @@ import {
 } from "@/lib/services/unitService";
 import { getUser } from "@/lib/services/userService";
 import { Condominium, CondominiumRole, Building, Unit, AppUser } from "@/lib/types";
+import Collapse from "@/components/Collapse";
 
 export default function ResidentsPage() {
   const { appUser } = useAuthContext();
@@ -26,6 +27,7 @@ export default function ResidentsPage() {
   const [roles, setRoles] = useState<CondominiumRole[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [pendingUnits, setPendingUnits] = useState<Unit[]>([]);
+  const [unitsByOwner, setUnitsByOwner] = useState<Record<string, Unit[]>>({});
   const [owners, setOwners] = useState<Record<string, AppUser>>({});
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState<string | null>(null);
@@ -51,16 +53,23 @@ export default function ResidentsPage() {
 
       const pending: Unit[] = [];
       const ownerIds = new Set<string>();
+      const byOwner: Record<string, Unit[]> = {};
+
       for (const building of b) {
         const units = await getUnitsByBuilding(building.id);
         for (const u of units) {
+          if (u.owner) {
+            if (!byOwner[u.owner]) byOwner[u.owner] = [];
+            byOwner[u.owner].push(u);
+            ownerIds.add(u.owner);
+          }
           if (u.owner_status === "pending") {
             pending.push(u);
-            if (u.owner) ownerIds.add(u.owner);
           }
         }
       }
       setPendingUnits(pending);
+      setUnitsByOwner(byOwner);
 
       const ownerMap: Record<string, AppUser> = {};
       for (const oid of ownerIds) {
@@ -220,29 +229,72 @@ export default function ResidentsPage() {
             .filter((r) => r.role === "resident")
             .map((r) => {
               const owner = owners[r.user] ?? null;
+              const units = unitsByOwner[r.user] ?? [];
               return (
-                <div
+                <Collapse
                   key={r.id}
-                  className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-black"
+                  title={owner?.name ?? r.invited_email ?? "Pendiente"}
+                  subtitle={
+                    owner?.email
+                      ? [owner.email, owner.phone].filter(Boolean).join(" · ")
+                      : r.invited_email ?? ""
+                  }
+                  badge={
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider ${
+                        r.status === "verified"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                          : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                      }`}
+                    >
+                      {r.status === "verified" ? "Verificado" : "Pendiente"}
+                    </span>
+                  }
                 >
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                      {owner?.name ?? r.invited_email ?? "Pendiente"}
+                  {units.length === 0 ? (
+                    <p className="text-sm text-zinc-400">
+                      Sin unidades asignadas
                     </p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {r.invited_email ?? ""}
-                    </p>
-                  </div>
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider ${
-                      r.status === "verified"
-                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                    }`}
-                  >
-                    {r.status === "verified" ? "Verificado" : "Pendiente"}
-                  </span>
-                </div>
+                  ) : (
+                    <div className="flex flex-col gap-1.5">
+                      {units.map((u) => {
+                        const building = buildings.find(
+                          (b) => b.id === u.building
+                        );
+                        return (
+                          <div
+                            key={u.id}
+                            className="flex items-center gap-3 rounded-lg bg-zinc-50 px-4 py-2.5 dark:bg-zinc-900"
+                          >
+                            <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                              {building?.name ?? "?"} / {u.num}
+                            </span>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+                                u.type === "residential"
+                                  ? "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400"
+                                  : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                              }`}
+                            >
+                              {u.type === "residential" ? "Hab." : "Ofi."}
+                            </span>
+                            <span
+                              className={`ml-auto text-[10px] font-medium ${
+                                u.owner_status === "verified"
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-amber-600 dark:text-amber-400"
+                              }`}
+                            >
+                              {u.owner_status === "verified"
+                                ? "Verificado"
+                                : "Pendiente"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </Collapse>
               );
             })}
         </div>
