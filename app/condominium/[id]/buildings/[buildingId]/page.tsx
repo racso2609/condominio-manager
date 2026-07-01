@@ -149,6 +149,15 @@ export default function BuildingDetail() {
                 <span className="font-medium text-zinc-900 dark:text-zinc-50">
                   {u.num}
                 </span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+                    u.type === "residential"
+                      ? "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400"
+                      : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                  }`}
+                >
+                  {u.type === "residential" ? "Hab." : "Ofi."}
+                </span>
                 <span className="text-xs text-zinc-400">
                   Piso {u.floor}
                 </span>

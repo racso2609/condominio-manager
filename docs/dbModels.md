@@ -47,6 +47,7 @@ unit:
 - building (FK → building.id)
 - num
 - floor
+- type: "residential" | "office"
 - owner (FK → user.id)
 - created_at
 - updated_at

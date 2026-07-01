@@ -8,6 +8,7 @@ export async function createUnit(data: {
   building: string;
   num: string;
   floor: number;
+  type: "residential" | "office";
   owner?: string;
 }): Promise<Unit> {
   const now = Timestamp.now();
@@ -16,6 +17,7 @@ export async function createUnit(data: {
     building: data.building,
     num: data.num,
     floor: data.floor,
+    type: data.type,
     owner: data.owner ?? "",
     created_at: now,
     updated_at: now,
@@ -27,7 +29,8 @@ export async function createUnit(data: {
 export async function generateUnits(
   buildingId: string,
   floors: number,
-  unitsPerFloor: number
+  unitsPerFloor: number,
+  type: "residential" | "office"
 ): Promise<Unit[]> {
   const now = Timestamp.now();
   const created: Unit[] = [];
@@ -40,6 +43,7 @@ export async function generateUnits(
         building: buildingId,
         num,
         floor: f,
+        type,
         owner: "",
         created_at: now,
         updated_at: now,
@@ -56,7 +60,7 @@ export async function getUnitsByBuilding(buildingId: string): Promise<Unit[]> {
   const snapshot = await getDocs(
     query(collection(db, COLLECTION), where("building", "==", buildingId))
   );
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Unit));
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Unit);
 }
 
 export async function deleteUnit(id: string): Promise<void> {

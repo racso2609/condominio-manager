@@ -12,10 +12,12 @@ export default function GenerateUnits() {
   const router = useRouter();
   const [floors, setFloors] = useState("");
   const [unitsPerFloor, setUnitsPerFloor] = useState("");
+  const [unitType, setUnitType] = useState<"residential" | "office">("residential");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const canCreate = appUser?.role === "admin" || appUser?.role === "administrator";
+  const canCreate =
+    appUser?.role === "admin" || appUser?.role === "administrator";
 
   if (!canCreate) {
     return (
@@ -47,7 +49,7 @@ export default function GenerateUnits() {
     setError("");
 
     try {
-      await generateUnits(params.buildingId as string, f, u);
+      await generateUnits(params.buildingId as string, f, u, unitType);
       router.push(`/condominium/${params.id}/buildings/${params.buildingId}`);
     } catch {
       setError("Ocurrió un error al generar las unidades. Intenta de nuevo.");
@@ -63,7 +65,7 @@ export default function GenerateUnits() {
     for (let fi = 0; fi < f; fi++) {
       const nums: string[] = [];
       for (let ui = 0; ui < u; ui++) {
-        nums.push(`${String(fi).padStart(2, "0")}${String(ui + 1).padStart(2, "0")}`);
+        nums.push(`${fi + 1}${ui + 1}`);
       }
       rows.push({ floor: fi, nums });
     }
@@ -73,7 +75,10 @@ export default function GenerateUnits() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
       <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-        <Link href="/home" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+        <Link
+          href="/home"
+          className="hover:text-zinc-700 dark:hover:text-zinc-200"
+        >
           Mis condominios
         </Link>
         <span>/</span>
@@ -91,7 +96,9 @@ export default function GenerateUnits() {
           Edificio
         </Link>
         <span>/</span>
-        <span className="text-zinc-900 dark:text-zinc-50">Generar unidades</span>
+        <span className="text-zinc-900 dark:text-zinc-50">
+          Generar unidades
+        </span>
       </div>
 
       <div className="rounded-xl border border-zinc-200 bg-white p-8 dark:border-zinc-800 dark:bg-black">
@@ -99,7 +106,8 @@ export default function GenerateUnits() {
           Generar unidades
         </h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Define la cantidad de pisos y unidades por piso para generarlas automáticamente.
+          Define la cantidad de pisos y unidades por piso para generarlas
+          automáticamente.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-6">
@@ -143,6 +151,36 @@ export default function GenerateUnits() {
             </div>
           </div>
 
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Tipo de unidades
+            </label>
+            <div className="flex gap-3">
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-300 px-4 py-3 text-sm has-[:checked]:border-zinc-900 has-[:checked]:bg-zinc-50 dark:border-zinc-700 dark:has-[:checked]:border-zinc-50 dark:has-[:checked]:bg-zinc-900">
+                <input
+                  type="radio"
+                  name="unitType"
+                  value="residential"
+                  checked={unitType === "residential"}
+                  onChange={() => setUnitType("residential")}
+                  className="accent-zinc-900 dark:accent-zinc-50"
+                />
+                Habitacional
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-300 px-4 py-3 text-sm has-[:checked]:border-zinc-900 has-[:checked]:bg-zinc-50 dark:border-zinc-700 dark:has-[:checked]:border-zinc-50 dark:has-[:checked]:bg-zinc-900">
+                <input
+                  type="radio"
+                  name="unitType"
+                  value="office"
+                  checked={unitType === "office"}
+                  onChange={() => setUnitType("office")}
+                  className="accent-zinc-900 dark:accent-zinc-50"
+                />
+                Oficina
+              </label>
+            </div>
+          </div>
+
           {preview && (
             <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-900">
               <p className="mb-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
@@ -151,7 +189,10 @@ export default function GenerateUnits() {
               </p>
               <div className="flex flex-col gap-2">
                 {[...preview].reverse().map((row) => (
-                  <div key={row.floor} className="flex items-center gap-2 text-sm">
+                  <div
+                    key={row.floor}
+                    className="flex items-center gap-2 text-sm"
+                  >
                     <span className="w-6 text-right text-xs text-zinc-400">
                       {row.floor}
                     </span>

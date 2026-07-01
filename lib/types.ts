@@ -49,6 +49,7 @@ export interface Unit {
   building: string;
   num: string;
   floor: number;
+  type: "residential" | "office";
   owner: string;
   created_at: Timestamp;
   updated_at: Timestamp;
