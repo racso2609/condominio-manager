@@ -12,6 +12,7 @@ const ALLOWED_TYPES = [
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 export default function NewAnnouncementPage() {
   const { appUser } = useAuthContext();
@@ -30,6 +31,11 @@ export default function NewAnnouncementPage() {
     const invalid = selected.find((f) => !ALLOWED_TYPES.includes(f.type));
     if (invalid) {
       alert(`Tipo de archivo no soportado: ${invalid.name}`);
+      return;
+    }
+    const tooBig = selected.find((f) => f.size > MAX_FILE_SIZE);
+    if (tooBig) {
+      alert(`El archivo "${tooBig.name}" supera el límite de 10 MB.`);
       return;
     }
     setFiles((prev) => [...prev, ...selected]);
@@ -134,7 +140,7 @@ export default function NewAnnouncementPage() {
 
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              Archivos (imágenes, PDFs, documentos)
+              Archivos (imágenes, PDFs, documentos · máx 10 MB c/u)
             </span>
             <input
               type="file"
@@ -146,27 +152,42 @@ export default function NewAnnouncementPage() {
           </label>
 
           {files.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              {files.map((f, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-3 rounded-lg bg-zinc-50 px-4 py-2 dark:bg-zinc-900"
-                >
-                  <span className="flex-1 truncate text-sm text-zinc-700 dark:text-zinc-300">
-                    {f.name}
-                  </span>
-                  <span className="text-[10px] text-zinc-400">
-                    {(f.size / 1024 / 1024).toFixed(1)} MB
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(i)}
-                    className="text-xs font-medium text-red-500 hover:text-red-700"
+            <div className="flex flex-col gap-2">
+              {files.map((f, i) => {
+                const isImage = f.type.startsWith("image/");
+                const previewUrl = isImage ? URL.createObjectURL(f) : null;
+                return (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 rounded-lg bg-zinc-50 px-4 py-2 dark:bg-zinc-900"
                   >
-                    Quitar
-                  </button>
-                </div>
-              ))}
+                    {isImage && previewUrl ? (
+                      <img
+                        src={previewUrl}
+                        alt=""
+                        className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-200 text-xs font-bold text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400">
+                        PDF
+                      </div>
+                    )}
+                    <span className="flex-1 truncate text-sm text-zinc-700 dark:text-zinc-300">
+                      {f.name}
+                    </span>
+                    <span className="text-[10px] text-zinc-400">
+                      {(f.size / 1024 / 1024).toFixed(1)} MB
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(i)}
+                      className="text-xs font-medium text-red-500 hover:text-red-700"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

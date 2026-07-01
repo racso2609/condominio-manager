@@ -161,7 +161,7 @@ export default function AnnouncementsPage() {
                         <img
                           src={img.url}
                           alt={img.name}
-                          className="h-32 w-48 object-cover transition-opacity group-hover:opacity-80"
+                          className="h-40 w-56 object-cover transition-opacity group-hover:opacity-80"
                         />
                       </a>
                     ))}
@@ -169,28 +169,18 @@ export default function AnnouncementsPage() {
                 )}
 
                 {docs.length > 0 && (
-                  <div className="mt-4 flex flex-col gap-1.5">
+                  <div className="mt-4 flex flex-wrap gap-3">
                     {docs.map((doc, i) => (
                       <a
                         key={i}
                         href={doc.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-3 rounded-lg bg-zinc-50 px-4 py-2.5 text-sm text-zinc-700 hover:bg-zinc-100 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                        className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
                       >
-                        <svg
-                          className="h-4 w-4 shrink-0"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                          />
-                        </svg>
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-[10px] font-bold text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                          PDF
+                        </div>
                         <span className="truncate">{doc.name}</span>
                       </a>
                     ))}

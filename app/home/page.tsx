@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
-import { getUserCondominiums, getPendingInvitesByEmail } from "@/lib/services/condominiumService";
+import AnnouncementPreview from "@/components/AnnouncementPreview";
+import StatusBadge from "@/components/StatusBadge";
+import { getUserCondominiums, getPendingInvitesByEmail, getCondominium } from "@/lib/services/condominiumService";
 import { getAnnouncementsByCondominium } from "@/lib/services/announcementService";
 import { getUser } from "@/lib/services/userService";
 import { Condominium, CondominiumRole, Announcement, AppUser } from "@/lib/types";
@@ -15,6 +17,9 @@ export default function Home() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [announcementAuthors, setAnnouncementAuthors] = useState<
     Record<string, AppUser>
+  >({});
+  const [condominiumNames, setCondominiumNames] = useState<
+    Record<string, string>
   >({});
   const [loading, setLoading] = useState(true);
 
@@ -29,15 +34,30 @@ export default function Home() {
 
       const allAnnouncements: Announcement[] = [];
       const authorIds = new Set<string>();
+      const condoIds = new Set<string>();
       for (const c of list) {
         const anns = await getAnnouncementsByCondominium(c.id);
         allAnnouncements.push(...anns);
-        anns.forEach((a) => authorIds.add(a.author));
+        anns.forEach((a) => {
+          authorIds.add(a.author);
+          condoIds.add(a.condominium);
+        });
       }
       allAnnouncements.sort(
         (a, b) => b.created_at.toMillis() - a.created_at.toMillis()
       );
-      setAnnouncements(allAnnouncements.slice(0, 10));
+      setAnnouncements(allAnnouncements);
+
+      const names: Record<string, string> = {};
+      for (const cid of condoIds) {
+        const c = list.find((c) => c.id === cid);
+        if (c) names[cid] = c.name;
+        else {
+          const fetched = await getCondominium(cid);
+          if (fetched) names[cid] = fetched.name;
+        }
+      }
+      setCondominiumNames(names);
 
       const map: Record<string, AppUser> = {};
       for (const uid of authorIds) {
@@ -132,49 +152,40 @@ export default function Home() {
         </section>
       )}
 
-      {!loading && announcements.length > 0 && (
-        <section>
-          <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            Últimas noticias
-          </h2>
-          <div className="flex flex-col gap-3">
-            {announcements.map((ann) => {
-              const author = announcementAuthors[ann.author];
-              const images =
-                ann.files?.filter((f) => f.type === "image") ?? [];
-              return (
-                <Link
+      {!loading && announcements.length > 0 && (() => {
+        const grouped: Record<string, Announcement[]> = {};
+        for (const ann of announcements) {
+          if (!grouped[ann.condominium]) grouped[ann.condominium] = [];
+          grouped[ann.condominium].push(ann);
+        }
+        return Object.entries(grouped).map(([condoId, anns]) => (
+          <section key={condoId}>
+            <Link
+              href={`/condominium/${condoId}/announcements`}
+              className="mb-4 inline-block text-lg font-semibold text-zinc-900 transition-colors hover:text-zinc-600 dark:text-zinc-50 dark:hover:text-zinc-400"
+            >
+              {condominiumNames[condoId] ?? "Condominio"} · Noticias
+            </Link>
+            <div className="flex flex-col gap-3">
+              {anns.slice(0, 5).map((ann) => (
+                <AnnouncementPreview
                   key={ann.id}
-                  href={`/condominium/${ann.condominium}/announcements`}
-                  className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-black dark:hover:border-zinc-700"
+                  announcement={ann}
+                  author={announcementAuthors[ann.author]}
+                />
+              ))}
+              {anns.length > 5 && (
+                <Link
+                  href={`/condominium/${condoId}/announcements`}
+                  className="text-center text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
                 >
-                  <div className="flex gap-4">
-                    {images.length > 0 && (
-                      <img
-                        src={images[0].url}
-                        alt=""
-                        className="h-16 w-24 shrink-0 rounded-lg object-cover"
-                      />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <h3 className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                        {ann.title}
-                      </h3>
-                      <p className="mt-1 line-clamp-2 text-xs text-zinc-500">
-                        {ann.content}
-                      </p>
-                      <p className="mt-1.5 text-[10px] text-zinc-400">
-                        {author?.name ?? ""} ·{" "}
-                        {ann.created_at.toDate().toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
+                  Ver todos ({anns.length})
                 </Link>
-              );
-            })}
-          </div>
-        </section>
-      )}
+              )}
+            </div>
+          </section>
+        ));
+      })()}
 
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -211,14 +222,8 @@ export default function Home() {
                 <h2 className="font-medium text-zinc-900 dark:text-zinc-50">
                   {c.name}
                 </h2>
-                <span
-                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider ${
-                    c.status === "complete"
-                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                      : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                  }`}
-                >
-                  {c.status === "complete" ? "Completo" : "Borrador"}
+                <span className="shrink-0">
+                  <StatusBadge status={c.status} />
                 </span>
               </div>
               {c.address && (

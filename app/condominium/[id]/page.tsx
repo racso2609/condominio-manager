@@ -8,6 +8,7 @@ import { getCondominium, updateCondominiumStatus } from "@/lib/services/condomin
 import { getBuildingsByCondominium } from "@/lib/services/buildingService";
 import { getUnitsByBuilding } from "@/lib/services/unitService";
 import { Condominium, Building } from "@/lib/types";
+import StatusBadge from "@/components/StatusBadge";
 
 export default function CondominiumDetail() {
   const { appUser } = useAuthContext();
@@ -96,14 +97,8 @@ export default function CondominiumDetail() {
               {condominium.address}
             </p>
           )}
-          <span
-            className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider ${
-              condominium.status === "complete"
-                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-            }`}
-          >
-            {condominium.status === "complete" ? "Completo" : "Borrador"}
+          <span className="mt-2 inline-block">
+            <StatusBadge status={condominium.status} />
           </span>
         </div>
 
