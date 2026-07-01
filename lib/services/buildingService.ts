@@ -1,8 +1,10 @@
 import { collection, doc, getDoc, getDocs, query, setDoc, Timestamp, updateDoc, deleteDoc, where } from "firebase/firestore";
 import { db } from "@/firebase";
-import { Building } from "@/lib/types";
+import { Building, Unit } from "@/lib/types";
+import { getUnitsByBuilding } from "@/lib/services/unitService";
 
 const COLLECTION = "buildings";
+const UNITS_COLLECTION = "units";
 
 export async function createBuilding(data: {
   condominium: string;
@@ -51,4 +53,37 @@ export async function getBuildingsByCondominium(condominiumId: string): Promise<
     query(collection(db, COLLECTION), where("condominium", "==", condominiumId))
   );
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Building));
+}
+
+export async function duplicateBuilding(
+  sourceBuildingId: string,
+  data: { condominium: string; name: string; symbol: string; address?: string }
+): Promise<Building> {
+  const now = Timestamp.now();
+  const buildingRef = doc(collection(db, COLLECTION));
+  const buildingData = {
+    condominium: data.condominium,
+    name: data.name,
+    symbol: data.symbol,
+    address: data.address ?? "",
+    created_at: now,
+    updated_at: now,
+  };
+  await setDoc(buildingRef, buildingData);
+
+  const sourceUnits = await getUnitsByBuilding(sourceBuildingId);
+  for (const unit of sourceUnits) {
+    const unitRef = doc(collection(db, UNITS_COLLECTION));
+    await setDoc(unitRef, {
+      building: buildingRef.id,
+      num: unit.num,
+      floor: unit.floor,
+      type: unit.type,
+      owner: "",
+      created_at: now,
+      updated_at: now,
+    });
+  }
+
+  return { id: buildingRef.id, ...buildingData };
 }

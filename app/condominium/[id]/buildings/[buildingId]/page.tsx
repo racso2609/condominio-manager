@@ -154,6 +154,12 @@ export default function BuildingDetail() {
             >
               Editar
             </Link>
+            <Link
+              href={`/condominium/${params.id}/buildings/${building.id}/duplicate`}
+              className="flex h-10 items-center rounded-full border border-zinc-200 px-5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            >
+              Duplicar
+            </Link>
             <button
               onClick={handleDeleteBuilding}
               disabled={deleting}
