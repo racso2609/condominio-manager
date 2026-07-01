@@ -9,8 +9,12 @@ import {
   getUnitsByBuilding,
   deleteUnit,
   updateUnitType,
+  claimUnit,
+  verifyUnitOwner,
+  rejectUnitClaim,
 } from "@/lib/services/unitService";
-import { Building, Unit } from "@/lib/types";
+import { getUser } from "@/lib/services/userService";
+import { Building, Unit, AppUser } from "@/lib/types";
 
 export default function BuildingDetail() {
   const { appUser } = useAuthContext();
@@ -22,17 +26,28 @@ export default function BuildingDetail() {
   const [deleting, setDeleting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [processing, setProcessing] = useState(false);
+  const [owners, setOwners] = useState<Record<string, AppUser>>({});
+  const [claiming, setClaiming] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState<string | null>(null);
   const isAdminOrManager =
     appUser?.role === "admin" || appUser?.role === "administrator";
 
   useEffect(() => {
     if (!params.buildingId) return;
     const id = params.buildingId as string;
-    Promise.all([getBuilding(id), getUnitsByBuilding(id)]).then(([b, u]) => {
+    Promise.all([getBuilding(id), getUnitsByBuilding(id)]).then(async ([b, u]) => {
       if (!b) router.replace(`/condominium/${params.id}`);
       else {
         setBuilding(b);
         setUnits(u);
+        const ownerIds = new Set(u.filter((unit) => unit.owner).map((unit) => unit.owner));
+        const ownerMap: Record<string, AppUser> = {};
+        for (const oid of ownerIds) {
+          const user = await getUser(oid);
+          if (user) ownerMap[oid] = user;
+        }
+        setOwners(ownerMap);
       }
       setLoading(false);
     });
@@ -97,6 +112,62 @@ export default function BuildingDetail() {
     if (!window.confirm(`¿Eliminar unidad ${unitNum}?`)) return;
     await deleteUnit(unitId);
     setUnits((prev) => prev.filter((u) => u.id !== unitId));
+  };
+
+  const handleClaim = async (unitId: string) => {
+    if (!appUser) return;
+    setClaiming(unitId);
+    try {
+      await claimUnit(unitId, appUser.id);
+      setUnits((prev) =>
+        prev.map((u) =>
+          u.id === unitId
+            ? { ...u, owner: appUser.id, owner_status: "pending" as const }
+            : u
+        )
+      );
+      const owner = await getUser(appUser.id);
+      if (owner) setOwners((prev) => ({ ...prev, [appUser.id]: owner }));
+    } catch {
+      alert("Error al reclamar unidad");
+    } finally {
+      setClaiming(null);
+    }
+  };
+
+  const handleVerifyUnit = async (unitId: string) => {
+    setVerifying(unitId);
+    try {
+      await verifyUnitOwner(unitId);
+      setUnits((prev) =>
+        prev.map((u) =>
+          u.id === unitId ? { ...u, owner_status: "verified" as const } : u
+        )
+      );
+    } catch {
+      alert("Error al validar");
+    } finally {
+      setVerifying(null);
+    }
+  };
+
+  const handleReject = async (unitId: string) => {
+    if (!window.confirm("¿Rechazar esta solicitud? El usuario no podrá reclamar esta unidad por 1 semana.")) return;
+    setRejecting(unitId);
+    try {
+      await rejectUnitClaim(unitId);
+      setUnits((prev) =>
+        prev.map((u) =>
+          u.id === unitId
+            ? { ...u, owner: "", owner_status: undefined }
+            : u
+        )
+      );
+    } catch {
+      alert("Error al rechazar");
+    } finally {
+      setRejecting(null);
+    }
   };
 
   if (loading) {
@@ -291,10 +362,63 @@ export default function BuildingDetail() {
                         >
                           {u.type === "residential" ? "Hab." : "Ofi."}
                         </span>
+                        {u.owner && owners[u.owner] && (
+                          <span className="ml-auto text-xs text-zinc-500 dark:text-zinc-400">
+                            {owners[u.owner]?.name}
+                            {owners[u.owner]?.phone && (
+                              <span className="ml-1 text-zinc-400">
+                                · {owners[u.owner]?.phone}
+                              </span>
+                            )}
+                            {u.owner_status === "pending" && (
+                              <span className="ml-1 text-amber-500">
+                                (Pendiente)
+                              </span>
+                            )}
+                          </span>
+                        )}
+                        {u.claim_blocked_until &&
+                          u.claim_blocked_until.toMillis() > Date.now() && (
+                            <span className="ml-auto text-[10px] text-red-400">
+                              Bloqueada
+                            </span>
+                          )}
+                        {!u.owner && appUser && !isAdminOrManager && !(
+                          u.claim_blocked_until &&
+                          u.claim_blocked_until.toMillis() > Date.now()
+                        ) && (
+                          <button
+                            onClick={() => handleClaim(u.id)}
+                            disabled={claiming === u.id}
+                            className="ml-auto h-7 rounded-full border border-zinc-300 px-3 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                          >
+                            {claiming === u.id ? "..." : "Reclamar"}
+                          </button>
+                        )}
+                        {isAdminOrManager &&
+                          u.owner_status === "pending" &&
+                          !selected.has(u.id) && (
+                            <>
+                              <button
+                                onClick={() => handleVerifyUnit(u.id)}
+                                disabled={verifying === u.id}
+                                className="h-7 rounded-full bg-emerald-600 px-3 text-xs font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-40"
+                              >
+                                {verifying === u.id ? "..." : "Validar"}
+                              </button>
+                              <button
+                                onClick={() => handleReject(u.id)}
+                                disabled={rejecting === u.id}
+                                className="h-7 rounded-full border border-red-300 px-3 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                              >
+                                {rejecting === u.id ? "..." : "Rechazar"}
+                              </button>
+                            </>
+                          )}
                         {isAdminOrManager && !selected.has(u.id) && (
                           <button
                             onClick={() => handleDeleteUnit(u.id, u.num)}
-                            className="ml-auto text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                            className="text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                           >
                             Eliminar
                           </button>

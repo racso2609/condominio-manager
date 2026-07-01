@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
-import { getCondominium } from "@/lib/services/condominiumService";
+import { getCondominium, updateCondominiumStatus } from "@/lib/services/condominiumService";
 import { getBuildingsByCondominium } from "@/lib/services/buildingService";
+import { getUnitsByBuilding } from "@/lib/services/unitService";
 import { Condominium, Building } from "@/lib/types";
 
 export default function CondominiumDetail() {
@@ -15,23 +16,55 @@ export default function CondominiumDetail() {
   const [condominium, setCondominium] = useState<Condominium | null>(null);
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [loading, setLoading] = useState(true);
+  const [changingStatus, setChangingStatus] = useState(false);
   const isAdminOrManager =
     appUser?.role === "admin" || appUser?.role === "administrator";
 
-  useEffect(() => {
+  const fetchData = async () => {
     if (!params.id) return;
     const id = params.id as string;
-    Promise.all([getCondominium(id), getBuildingsByCondominium(id)]).then(
-      ([c, b]) => {
-        if (!c) router.replace("/home");
-        else {
-          setCondominium(c);
-          setBuildings(b);
-        }
-        setLoading(false);
-      }
-    );
+    const [c, b] = await Promise.all([getCondominium(id), getBuildingsByCondominium(id)]);
+    if (!c) router.replace("/home");
+    else {
+      setCondominium(c);
+      setBuildings(b);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
   }, [params.id, router]);
+
+  const handleToggleStatus = async () => {
+    if (!condominium || !appUser) return;
+    const targetStatus = condominium.status === "draft" ? "complete" : "draft";
+
+    if (targetStatus === "complete") {
+      if (buildings.length === 0) {
+        alert("El condominio debe tener al menos un edificio.");
+        return;
+      }
+      const unitCounts = await Promise.all(
+        buildings.map((b) => getUnitsByBuilding(b.id).then((u) => u.length))
+      );
+      const hasEmptyBuilding = unitCounts.some((count) => count === 0);
+      if (hasEmptyBuilding) {
+        alert("Todos los edificios deben tener al menos una unidad.");
+        return;
+      }
+    }
+
+    setChangingStatus(true);
+    try {
+      await updateCondominiumStatus(condominium.id, targetStatus);
+      setCondominium((prev) => prev ? { ...prev, status: targetStatus } : prev);
+    } catch {
+      alert("Error al cambiar el estado");
+    } finally {
+      setChangingStatus(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -75,14 +108,51 @@ export default function CondominiumDetail() {
         </div>
 
         {isAdminOrManager && (
-          <Link
-            href={`/condominium/${condominium.id}/buildings/new`}
-            className="h-10 rounded-full bg-zinc-900 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
-          >
-            Añadir edificio
-          </Link>
+          <div className="flex gap-2">
+            {condominium.status === "draft" && (
+              <button
+                onClick={handleToggleStatus}
+                disabled={changingStatus}
+                className="h-10 rounded-full bg-emerald-600 px-5 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
+              >
+                {changingStatus ? "..." : "Completar registro"}
+              </button>
+            )}
+            {condominium.status === "complete" && (
+              <button
+                onClick={handleToggleStatus}
+                disabled={changingStatus}
+                className="h-10 rounded-full border border-zinc-200 px-5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              >
+                {changingStatus ? "..." : "Volver a borrador"}
+              </button>
+            )}
+            <Link
+              href={`/condominium/${condominium.id}/buildings/new`}
+              className="flex h-10 items-center rounded-full bg-zinc-900 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+            >
+              Añadir edificio
+            </Link>
+          </div>
         )}
       </div>
+
+      {isAdminOrManager && (
+        <div className="flex gap-2">
+          <Link
+            href={`/condominium/${condominium.id}/invite`}
+            className="h-9 rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          >
+            Invitar residentes
+          </Link>
+          <Link
+            href={`/condominium/${condominium.id}/residents`}
+            className="h-9 rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          >
+            Gestionar residentes
+          </Link>
+        </div>
+      )}
 
       {buildings.length === 0 ? (
         <section className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-black">

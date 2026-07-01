@@ -4,6 +4,7 @@ export interface AppUser {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   role: "admin" | "user" | "administrator";
   photoURL?: string | null;
   created_at: Timestamp;
@@ -51,6 +52,8 @@ export interface Unit {
   floor: number;
   type: "residential" | "office";
   owner: string;
+  owner_status?: "pending" | "verified";
+  claim_blocked_until?: Timestamp;
   created_at: Timestamp;
   updated_at: Timestamp;
 }

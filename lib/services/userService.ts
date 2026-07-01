@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, updateDoc, Timestamp } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, Timestamp, where } from "firebase/firestore";
 import { db } from "@/firebase";
 import { AppUser } from "@/lib/types";
 
@@ -29,7 +29,16 @@ export async function createUser(
 
 export async function updateUser(
   id: string,
-  data: Partial<Pick<AppUser, "name" | "photoURL" | "role">>
+  data: Partial<Pick<AppUser, "name" | "photoURL" | "role" | "phone">>
 ): Promise<void> {
   await updateDoc(doc(db, COLLECTION, id), { ...data, updated_at: Timestamp.now() });
+}
+
+export async function getUserByEmail(email: string): Promise<AppUser | null> {
+  const snapshot = await getDocs(
+    query(collection(db, COLLECTION), where("email", "==", email))
+  );
+  if (snapshot.empty) return null;
+  const doc = snapshot.docs[0];
+  return { id: doc.id, ...doc.data() } as AppUser;
 }

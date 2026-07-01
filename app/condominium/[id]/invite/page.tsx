@@ -1,0 +1,190 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { useAuthContext } from "@/context/authContext";
+import {
+  getCondominium,
+  createInvite,
+  getCondominiumRoles,
+} from "@/lib/services/condominiumService";
+import { Condominium, CondominiumRole } from "@/lib/types";
+
+const BASE_URL = typeof window !== "undefined" ? window.location.origin : "";
+
+export default function InviteResidentPage() {
+  const { appUser } = useAuthContext();
+  const params = useParams();
+  const router = useRouter();
+  const [condominium, setCondominium] = useState<Condominium | null>(null);
+  const [roles, setRoles] = useState<CondominiumRole[]>([]);
+  const [email, setEmail] = useState("");
+  const [sending, setSending] = useState(false);
+  const [lastLink, setLastLink] = useState("");
+  const [loading, setLoading] = useState(true);
+  const isAdminOrManager =
+    appUser?.role === "admin" || appUser?.role === "administrator";
+
+  useEffect(() => {
+    if (!params.id) return;
+    const id = params.id as string;
+    Promise.all([getCondominium(id), getCondominiumRoles(id)]).then(([c, r]) => {
+      if (!c) router.replace("/home");
+      else {
+        setCondominium(c);
+        setRoles(r.filter((role) => role.invited_email));
+      }
+      setLoading(false);
+    });
+  }, [params.id, router]);
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !appUser || !condominium) return;
+    setSending(true);
+    try {
+      const role = await createInvite(condominium.id, appUser.id, email.trim());
+      setRoles((prev) => [...prev, role]);
+      setLastLink(`${BASE_URL}/invite?token=${role.token}`);
+      setEmail("");
+    } catch {
+      alert("Error al enviar invitación");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const copyLink = (token: string) => {
+    navigator.clipboard.writeText(`${BASE_URL}/invite?token=${token}`);
+  };
+
+  const copyFromRole = (role: CondominiumRole) => {
+    if (role.token) copyLink(role.token);
+  };
+
+  if (loading) {
+    return (
+      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
+        <div className="h-48 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900" />
+      </div>
+    );
+  }
+
+  if (!condominium) return null;
+
+  if (!isAdminOrManager) {
+    return (
+      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
+        <p className="text-zinc-500 dark:text-zinc-400">
+          No tienes permisos para invitar residentes.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
+      <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
+        <Link
+          href="/home"
+          className="hover:text-zinc-700 dark:hover:text-zinc-200"
+        >
+          Mis condominios
+        </Link>
+        <span>/</span>
+        <Link
+          href={`/condominium/${condominium.id}`}
+          className="hover:text-zinc-700 dark:hover:text-zinc-200"
+        >
+          {condominium.name}
+        </Link>
+        <span>/</span>
+        <span className="text-zinc-900 dark:text-zinc-50">Invitar</span>
+      </div>
+
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          Invitar residente
+        </h1>
+        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+          {condominium.name}
+        </p>
+      </div>
+
+      <form onSubmit={handleInvite} className="flex gap-3">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Correo del residente"
+          required
+          className="flex-1 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:placeholder-zinc-500 dark:focus:border-zinc-500"
+        />
+        <button
+          type="submit"
+          disabled={sending || !email.trim()}
+          className="h-10 rounded-full bg-zinc-900 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+        >
+          {sending ? "Enviando..." : "Invitar"}
+        </button>
+      </form>
+
+      {lastLink && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-900/20">
+          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+            Link de invitación generado
+          </p>
+          <div className="mt-2 flex gap-2">
+            <code className="flex-1 truncate rounded-lg bg-white px-3 py-2 text-xs text-zinc-700 dark:bg-black dark:text-zinc-300">
+              {lastLink}
+            </code>
+            <button
+              onClick={() => navigator.clipboard.writeText(lastLink)}
+              className="rounded-full border border-emerald-300 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
+            >
+              Copiar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {roles.length > 0 && (
+        <section>
+          <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+            Invitaciones enviadas
+          </h2>
+          <div className="flex flex-col gap-2">
+            {roles.map((r) => (
+              <div
+                key={r.id}
+                className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-black"
+              >
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                    {r.invited_email}
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {r.user
+                      ? "Aceptada"
+                      : r.expires_at
+                        ? `Pendiente — expira ${r.expires_at.toDate().toLocaleDateString()}`
+                        : "Pendiente"}
+                  </p>
+                </div>
+                {!r.user && r.token && (
+                  <button
+                    onClick={() => copyFromRole(r)}
+                    className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  >
+                    Copiar link
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}

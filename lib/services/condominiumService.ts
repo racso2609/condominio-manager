@@ -8,6 +8,7 @@ import {
   documentId,
   Timestamp,
   setDoc,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "@/firebase";
 import { Condominium, CondominiumRole } from "@/lib/types";
@@ -84,4 +85,94 @@ export async function getCondominiumRoles(condominiumId: string): Promise<Condom
     query(collection(db, ROLE_COLLECTION), where("condominium", "==", condominiumId))
   );
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as CondominiumRole));
+}
+
+function generateToken(): string {
+  return crypto.randomUUID();
+}
+
+export async function createInvite(
+  condominiumId: string,
+  invitedBy: string,
+  email: string,
+): Promise<CondominiumRole> {
+  const now = Timestamp.now();
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+  const ref = doc(collection(db, ROLE_COLLECTION));
+  const roleData = {
+    condominium: condominiumId,
+    user: "",
+    role: "resident" as const,
+    status: "pending" as const,
+    invited_email: email,
+    invited_by: invitedBy,
+    token: generateToken(),
+    expires_at: Timestamp.fromDate(expiresAt),
+    created_at: now,
+    updated_at: now,
+  };
+  await setDoc(ref, roleData);
+  return { id: ref.id, ...roleData };
+}
+
+export async function getInviteByToken(token: string): Promise<CondominiumRole | null> {
+  const snapshot = await getDocs(
+    query(collection(db, ROLE_COLLECTION), where("token", "==", token))
+  );
+  if (snapshot.empty) return null;
+  const doc = snapshot.docs[0];
+  return { id: doc.id, ...doc.data() } as CondominiumRole;
+}
+
+export async function acceptInvite(token: string, userId: string): Promise<CondominiumRole> {
+  const role = await getInviteByToken(token);
+  if (!role) throw new Error("Invitación no encontrada");
+  if (role.expires_at && role.expires_at.toMillis() < Date.now())
+    throw new Error("Invitación expirada");
+  if (role.user)
+    throw new Error("Invitación ya fue aceptada");
+
+  const ref = doc(db, ROLE_COLLECTION, role.id);
+  await updateDoc(ref, { user: userId, updated_at: Timestamp.now() });
+  return { ...role, user: userId, updated_at: Timestamp.now() };
+}
+
+export async function getPendingInvitesByEmail(email: string): Promise<CondominiumRole[]> {
+  const snapshot = await getDocs(
+    query(
+      collection(db, ROLE_COLLECTION),
+      where("invited_email", "==", email),
+      where("user", "==", ""),
+    )
+  );
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as CondominiumRole));
+}
+
+export async function getPendingRoles(condominiumId: string): Promise<CondominiumRole[]> {
+  const snapshot = await getDocs(
+    query(
+      collection(db, ROLE_COLLECTION),
+      where("condominium", "==", condominiumId),
+      where("status", "==", "pending"),
+    )
+  );
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as CondominiumRole));
+}
+
+export async function verifyRole(roleId: string): Promise<void> {
+  await updateDoc(doc(db, ROLE_COLLECTION, roleId), {
+    status: "verified",
+    updated_at: Timestamp.now(),
+  });
+}
+
+export async function updateCondominiumStatus(
+  id: string,
+  status: "draft" | "complete",
+): Promise<void> {
+  await updateDoc(doc(db, CONDO_COLLECTION, id), {
+    status,
+    updated_at: Timestamp.now(),
+  });
 }
