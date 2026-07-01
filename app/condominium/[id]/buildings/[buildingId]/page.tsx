@@ -58,9 +58,7 @@ export default function BuildingDetail() {
   const clearSelection = () => setSelected(new Set());
 
   const bulkDelete = async () => {
-    if (
-      !window.confirm(`¿Eliminar ${selected.size} unidades seleccionadas?`)
-    )
+    if (!window.confirm(`¿Eliminar ${selected.size} unidades seleccionadas?`))
       return;
     setProcessing(true);
     await Promise.all([...selected].map((id) => deleteUnit(id)));
@@ -73,7 +71,7 @@ export default function BuildingDetail() {
     setProcessing(true);
     await Promise.all([...selected].map((id) => updateUnitType(id, type)));
     setUnits((prev) =>
-      prev.map((u) => (selected.has(u.id) ? { ...u, type } : u))
+      prev.map((u) => (selected.has(u.id) ? { ...u, type } : u)),
     );
     setSelected(new Set());
     setProcessing(false);
@@ -82,7 +80,7 @@ export default function BuildingDetail() {
   const handleDeleteBuilding = async () => {
     if (
       !window.confirm(
-        "¿Eliminar este edificio? Esta acción no se puede deshacer."
+        "¿Eliminar este edificio? Esta acción no se puede deshacer.",
       )
     )
       return;
@@ -114,7 +112,10 @@ export default function BuildingDetail() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
       <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-        <Link href="/home" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+        <Link
+          href="/home"
+          className="hover:text-zinc-700 dark:hover:text-zinc-200"
+        >
           Mis condominios
         </Link>
         <span>/</span>
@@ -225,7 +226,7 @@ export default function BuildingDetail() {
           </p>
         </section>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-6">
           {isAdminOrManager && units.length > 0 && (
             <label className="flex cursor-pointer items-center gap-3 px-1 py-1">
               <input
@@ -241,51 +242,64 @@ export default function BuildingDetail() {
               </span>
             </label>
           )}
-          {units
-            .sort((a, b) => b.floor - a.floor)
-            .map((u) => (
-              <div
-                key={u.id}
-                className={`flex items-center gap-4 rounded-xl border bg-white px-5 py-4 shadow-sm transition-colors dark:bg-black ${
-                  selected.has(u.id)
-                    ? "border-zinc-900 dark:border-zinc-50"
-                    : "border-zinc-200 dark:border-zinc-800"
-                }`}
-              >
-                {isAdminOrManager && (
-                  <input
-                    type="checkbox"
-                    checked={selected.has(u.id)}
-                    onChange={() => toggleUnit(u.id)}
-                    className="accent-zinc-900 dark:accent-zinc-50"
-                  />
-                )}
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100 text-xs font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                  {u.floor}
-                </span>
-                <span className="font-medium text-zinc-900 dark:text-zinc-50">
-                  {u.num}
-                </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
-                    u.type === "residential"
-                      ? "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400"
-                      : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                  }`}
-                >
-                  {u.type === "residential" ? "Hab." : "Ofi."}
-                </span>
-                <span className="text-xs text-zinc-400">Piso {u.floor}</span>
-                {isAdminOrManager && !selected.has(u.id) && (
-                  <button
-                    onClick={() => handleDeleteUnit(u.id, u.num)}
-                    className="ml-auto text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                  >
-                    Eliminar
-                  </button>
-                )}
-              </div>
-            ))}
+          {(() => {
+            const floors = [...new Set(units.map((u) => u.floor))].sort(
+              (a, b) => b - a
+            );
+            return floors.map((floor) => {
+              const floorUnits = units
+                .filter((u) => u.floor === floor)
+                .sort((a, b) => a.num.localeCompare(b.num));
+              return (
+                <div key={floor}>
+                  <h3 className="mb-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                    Piso {floor}
+                  </h3>
+                  <div className="flex flex-col gap-2">
+                    {floorUnits.map((u) => (
+                      <div
+                        key={u.id}
+                        className={`flex items-center gap-4 rounded-xl border bg-white px-5 py-4 shadow-sm transition-colors dark:bg-black ${
+                          selected.has(u.id)
+                            ? "border-zinc-900 dark:border-zinc-50"
+                            : "border-zinc-200 dark:border-zinc-800"
+                        }`}
+                      >
+                        {isAdminOrManager && (
+                          <input
+                            type="checkbox"
+                            checked={selected.has(u.id)}
+                            onChange={() => toggleUnit(u.id)}
+                            className="accent-zinc-900 dark:accent-zinc-50"
+                          />
+                        )}
+                        <span className="font-medium text-zinc-900 dark:text-zinc-50">
+                          {u.num}
+                        </span>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+                            u.type === "residential"
+                              ? "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400"
+                              : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                          }`}
+                        >
+                          {u.type === "residential" ? "Hab." : "Ofi."}
+                        </span>
+                        {isAdminOrManager && !selected.has(u.id) && (
+                          <button
+                            onClick={() => handleDeleteUnit(u.id, u.num)}
+                            className="ml-auto text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                          >
+                            Eliminar
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            });
+          })()}
         </div>
       )}
     </div>
