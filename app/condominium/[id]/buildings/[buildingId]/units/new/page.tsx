@@ -15,7 +15,7 @@ export default function GenerateUnits() {
   const [unitType, setUnitType] = useState<"residential" | "office">("residential");
   const [prefix, setPrefix] = useState("");
   const [suffix, setSuffix] = useState("");
-  const [offset, setOffset] = useState("1");
+  const [floorOffset, setFloorOffset] = useState("0");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -47,13 +47,13 @@ export default function GenerateUnits() {
     e.preventDefault();
     const f = parseInt(floors, 10);
     const u = parseInt(unitsPerFloor, 10);
-    const o = parseInt(offset, 10);
-    if (isNaN(f) || isNaN(u) || f < 1 || u < 1 || isNaN(o) || o < 1) return;
+    const fo = parseInt(floorOffset, 10);
+    if (isNaN(f) || isNaN(u) || f < 1 || u < 1 || isNaN(fo) || fo < 0) return;
     setSubmitting(true);
     setError("");
 
     try {
-      await generateUnits(params.buildingId as string, f, u, unitType, o, prefix, suffix);
+      await generateUnits(params.buildingId as string, f, u, unitType, fo, prefix, suffix);
       router.push(`/condominium/${params.id}/buildings/${params.buildingId}`);
     } catch {
       setError("Ocurrió un error al generar las unidades. Intenta de nuevo.");
@@ -64,15 +64,16 @@ export default function GenerateUnits() {
   const preview = (() => {
     const f = parseInt(floors, 10);
     const u = parseInt(unitsPerFloor, 10);
-    const o = parseInt(offset, 10);
-    if (isNaN(f) || isNaN(u) || f < 1 || u < 1 || isNaN(o) || o < 1) return null;
+    const fo = parseInt(floorOffset, 10);
+    if (isNaN(f) || isNaN(u) || f < 1 || u < 1 || isNaN(fo) || fo < 0) return null;
     const rows: { floor: number; nums: string[] }[] = [];
     for (let fi = 0; fi < f; fi++) {
+      const actualFloor = fi + fo;
       const nums: string[] = [];
       for (let ui = 0; ui < u; ui++) {
-        nums.push(getUnitNumber(fi, ui, o, prefix, suffix));
+        nums.push(getUnitNumber(actualFloor, ui, prefix, suffix));
       }
-      rows.push({ floor: fi, nums });
+      rows.push({ floor: actualFloor, nums });
     }
     return rows;
   })();
@@ -223,17 +224,18 @@ export default function GenerateUnits() {
 
             <div>
               <label
-                htmlFor="offset"
+                htmlFor="floorOffset"
                 className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
               >
-                Offset inicial
+                Piso inicial
               </label>
               <input
-                id="offset"
+                id="floorOffset"
                 type="number"
-                value={offset}
-                onChange={(e) => setOffset(e.target.value)}
-                min="1"
+                value={floorOffset}
+                onChange={(e) => setFloorOffset(e.target.value)}
+                placeholder="Ej: 4"
+                min="0"
                 className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-4 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder-zinc-500 dark:focus:border-zinc-400"
               />
             </div>
