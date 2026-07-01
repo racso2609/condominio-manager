@@ -1,1 +1,0 @@
-export const connectDb = async () => {};
