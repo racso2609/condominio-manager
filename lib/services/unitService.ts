@@ -5,8 +5,8 @@ import {
   getDocs,
   query,
   setDoc,
-  Timestamp,
   updateDoc,
+  Timestamp,
   where,
 } from "firebase/firestore";
 import { db } from "@/firebase";
@@ -14,8 +14,15 @@ import { Unit } from "@/lib/types";
 
 const COLLECTION = "units";
 
-export function getUnitNumber(floor: number, index: number): string {
-  return `${floor + 1}${index + 1}`;
+export function getUnitNumber(
+  floor: number,
+  index: number,
+  offset: number = 1,
+  prefix: string = "",
+  suffix: string = "",
+): string {
+  const num = `${floor + 1}${index + 1}`;
+  return `${prefix}${num}${suffix}`;
 }
 
 export async function createUnit(data: {
@@ -45,13 +52,16 @@ export async function generateUnits(
   floors: number,
   unitsPerFloor: number,
   type: "residential" | "office",
+  offset: number = 1,
+  prefix: string = "",
+  suffix: string = "",
 ): Promise<Unit[]> {
   const now = Timestamp.now();
   const created: Unit[] = [];
 
   for (let f = 0; f < floors; f++) {
     for (let u = 0; u < unitsPerFloor; u++) {
-      const num = `${String(f).padStart(2, "0")}${String(u + 1).padStart(2, "0")}`;
+      const num = getUnitNumber(f, u, offset, prefix, suffix);
       const ref = doc(collection(db, COLLECTION));
       const unitData = {
         building: buildingId,

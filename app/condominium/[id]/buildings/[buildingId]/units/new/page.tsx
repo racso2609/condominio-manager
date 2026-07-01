@@ -13,6 +13,9 @@ export default function GenerateUnits() {
   const [floors, setFloors] = useState("");
   const [unitsPerFloor, setUnitsPerFloor] = useState("");
   const [unitType, setUnitType] = useState<"residential" | "office">("residential");
+  const [prefix, setPrefix] = useState("");
+  const [suffix, setSuffix] = useState("");
+  const [offset, setOffset] = useState("1");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -44,12 +47,13 @@ export default function GenerateUnits() {
     e.preventDefault();
     const f = parseInt(floors, 10);
     const u = parseInt(unitsPerFloor, 10);
-    if (isNaN(f) || isNaN(u) || f < 1 || u < 1) return;
+    const o = parseInt(offset, 10);
+    if (isNaN(f) || isNaN(u) || f < 1 || u < 1 || isNaN(o) || o < 1) return;
     setSubmitting(true);
     setError("");
 
     try {
-      await generateUnits(params.buildingId as string, f, u, unitType);
+      await generateUnits(params.buildingId as string, f, u, unitType, o, prefix, suffix);
       router.push(`/condominium/${params.id}/buildings/${params.buildingId}`);
     } catch {
       setError("Ocurrió un error al generar las unidades. Intenta de nuevo.");
@@ -60,12 +64,13 @@ export default function GenerateUnits() {
   const preview = (() => {
     const f = parseInt(floors, 10);
     const u = parseInt(unitsPerFloor, 10);
-    if (isNaN(f) || isNaN(u) || f < 1 || u < 1) return null;
+    const o = parseInt(offset, 10);
+    if (isNaN(f) || isNaN(u) || f < 1 || u < 1 || isNaN(o) || o < 1) return null;
     const rows: { floor: number; nums: string[] }[] = [];
     for (let fi = 0; fi < f; fi++) {
       const nums: string[] = [];
       for (let ui = 0; ui < u; ui++) {
-        nums.push(getUnitNumber(fi, ui));
+        nums.push(getUnitNumber(fi, ui, o, prefix, suffix));
       }
       rows.push({ floor: fi, nums });
     }
@@ -178,6 +183,59 @@ export default function GenerateUnits() {
                 />
                 Oficina
               </label>
+            </div>
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-3">
+            <div>
+              <label
+                htmlFor="prefix"
+                className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+              >
+                Prefijo (opcional)
+              </label>
+              <input
+                id="prefix"
+                type="text"
+                value={prefix}
+                onChange={(e) => setPrefix(e.target.value)}
+                placeholder="Ej: A-"
+                className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-4 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder-zinc-500 dark:focus:border-zinc-400"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="suffix"
+                className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+              >
+                Sufijo (opcional)
+              </label>
+              <input
+                id="suffix"
+                type="text"
+                value={suffix}
+                onChange={(e) => setSuffix(e.target.value)}
+                placeholder="Ej: -B"
+                className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-4 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder-zinc-500 dark:focus:border-zinc-400"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="offset"
+                className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+              >
+                Offset inicial
+              </label>
+              <input
+                id="offset"
+                type="number"
+                value={offset}
+                onChange={(e) => setOffset(e.target.value)}
+                min="1"
+                className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-4 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder-zinc-500 dark:focus:border-zinc-400"
+              />
             </div>
           </div>
 

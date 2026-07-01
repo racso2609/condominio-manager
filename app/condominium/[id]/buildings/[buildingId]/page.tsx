@@ -169,7 +169,7 @@ export default function BuildingDetail() {
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
           Unidades {units.length > 0 && `(${units.length})`}
         </h2>
-        {isAdminOrManager && units.length === 0 && (
+        {isAdminOrManager && (
           <Link
             href={`/condominium/${params.id}/buildings/${building.id}/units/new`}
             className="h-9 rounded-full bg-zinc-900 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
