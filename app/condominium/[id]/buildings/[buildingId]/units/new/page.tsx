@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
-import { generateUnits } from "@/lib/services/unitService";
+import { generateUnits, getUnitNumber } from "@/lib/services/unitService";
 
 export default function GenerateUnits() {
   const { appUser } = useAuthContext();
@@ -65,7 +65,7 @@ export default function GenerateUnits() {
     for (let fi = 0; fi < f; fi++) {
       const nums: string[] = [];
       for (let ui = 0; ui < u; ui++) {
-        nums.push(`${fi + 1}${ui + 1}`);
+        nums.push(getUnitNumber(fi, ui));
       }
       rows.push({ floor: fi, nums });
     }
