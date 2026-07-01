@@ -1,11 +1,21 @@
-import { collection, doc, deleteDoc, getDocs, query, setDoc, updateDoc, Timestamp, where } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  deleteDoc,
+  getDocs,
+  query,
+  setDoc,
+  Timestamp,
+  updateDoc,
+  where,
+} from "firebase/firestore";
 import { db } from "@/firebase";
 import { Unit } from "@/lib/types";
 
 const COLLECTION = "units";
 
 export function getUnitNumber(floor: number, index: number): string {
-  return `${String(floor).padStart(2, "0")}${String(index + 1).padStart(2, "0")}`;
+  return `${floor + 1}${index + 1}`;
 }
 
 export async function createUnit(data: {
@@ -34,7 +44,7 @@ export async function generateUnits(
   buildingId: string,
   floors: number,
   unitsPerFloor: number,
-  type: "residential" | "office"
+  type: "residential" | "office",
 ): Promise<Unit[]> {
   const now = Timestamp.now();
   const created: Unit[] = [];
@@ -73,7 +83,10 @@ export async function deleteUnit(id: string): Promise<void> {
 
 export async function updateUnitType(
   id: string,
-  type: "residential" | "office"
+  type: "residential" | "office",
 ): Promise<void> {
-  await updateDoc(doc(db, COLLECTION, id), { type, updated_at: Timestamp.now() });
+  await updateDoc(doc(db, COLLECTION, id), {
+    type,
+    updated_at: Timestamp.now(),
+  });
 }
