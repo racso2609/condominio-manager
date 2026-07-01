@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
 import { getBuilding, deleteBuilding } from "@/lib/services/buildingService";
-import { getUnitsByBuilding } from "@/lib/services/unitService";
+import { getUnitsByBuilding, deleteUnit } from "@/lib/services/unitService";
 import { Building, Unit } from "@/lib/types";
 
 export default function BuildingDetail() {
@@ -32,7 +32,7 @@ export default function BuildingDetail() {
     });
   }, [params.buildingId, params.id, router]);
 
-  const handleDelete = async () => {
+  const handleDeleteBuilding = async () => {
     if (!window.confirm("¿Eliminar este edificio? Esta acción no se puede deshacer.")) return;
     setDeleting(true);
     try {
@@ -41,6 +41,12 @@ export default function BuildingDetail() {
     } catch {
       setDeleting(false);
     }
+  };
+
+  const handleDeleteUnit = async (unitId: string, unitNum: string) => {
+    if (!window.confirm(`¿Eliminar unidad ${unitNum}?`)) return;
+    await deleteUnit(unitId);
+    setUnits((prev) => prev.filter((u) => u.id !== unitId));
   };
 
   if (loading) {
@@ -96,7 +102,7 @@ export default function BuildingDetail() {
               Editar
             </Link>
             <button
-              onClick={handleDelete}
+              onClick={handleDeleteBuilding}
               disabled={deleting}
               className="flex h-10 items-center rounded-full border border-red-200 px-5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-900/20"
             >
@@ -115,7 +121,7 @@ export default function BuildingDetail() {
             href={`/condominium/${params.id}/buildings/${building.id}/units/new`}
             className="h-9 rounded-full bg-zinc-900 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
           >
-            Añadir unidad
+            Generar unidades
           </Link>
         )}
       </div>
@@ -124,7 +130,7 @@ export default function BuildingDetail() {
         <section className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-black">
           <p className="text-zinc-500 dark:text-zinc-400">
             {isAdminOrManager
-              ? "Usa el botón \"Añadir unidad\" para comenzar a registrar las unidades de este edificio."
+              ? "Usa el botón \"Generar unidades\" para crearlas automáticamente."
               : "No hay unidades registradas en este edificio."}
           </p>
         </section>
@@ -143,9 +149,17 @@ export default function BuildingDetail() {
                 <span className="font-medium text-zinc-900 dark:text-zinc-50">
                   {u.num}
                 </span>
-                <span className="ml-auto text-xs text-zinc-400">
+                <span className="text-xs text-zinc-400">
                   Piso {u.floor}
                 </span>
+                {isAdminOrManager && (
+                  <button
+                    onClick={() => handleDeleteUnit(u.id, u.num)}
+                    className="ml-auto text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                  >
+                    Eliminar
+                  </button>
+                )}
               </div>
             ))}
         </div>
