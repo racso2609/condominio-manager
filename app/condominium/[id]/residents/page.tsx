@@ -16,8 +16,38 @@ import {
   rejectUnitClaim,
 } from "@/lib/services/unitService";
 import { getUser } from "@/lib/services/userService";
-import { Condominium, CondominiumRole, Building, Unit, AppUser } from "@/lib/types";
+import {
+  getExpensesByCondominium,
+  getExpensesByBuilding,
+} from "@/lib/services/expenseService";
+import {
+  getEntriesByExpense,
+  markEntryAsPaid,
+} from "@/lib/services/expenseEntryService";
+import { getPaymentMethodsByCondominium } from "@/lib/services/paymentMethodService";
+import {
+  Condominium,
+  CondominiumRole,
+  Building,
+  Unit,
+  AppUser,
+  Expense,
+  ExpenseEntry,
+  PaymentMethod,
+  PaymentMethodType,
+} from "@/lib/types";
 import Collapse from "@/components/Collapse";
+import PaymentOrderItem from "@/components/PaymentOrderItem";
+
+const TYPE_LABELS: Record<PaymentMethodType, string> = {
+  bank_transfer: "Transferencia bancaria",
+  mobile_payment: "Pago móvil",
+  zelle: "Zelle",
+  paypal: "PayPal",
+  venmo: "Venmo",
+  cash: "Efectivo",
+  other: "Otro",
+};
 
 export default function ResidentsPage() {
   const { appUser } = useAuthContext();
@@ -29,9 +59,17 @@ export default function ResidentsPage() {
   const [pendingUnits, setPendingUnits] = useState<Unit[]>([]);
   const [unitsByOwner, setUnitsByOwner] = useState<Record<string, Unit[]>>({});
   const [owners, setOwners] = useState<Record<string, AppUser>>({});
+  const [expenses, setExpenses] = useState<Record<string, Expense>>({});
+  const [entriesByUnit, setEntriesByUnit] = useState<
+    Record<string, ExpenseEntry[]>
+  >({});
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<string | null>(null);
+  const [validatingPaymentId, setValidatingPaymentId] = useState<string | null>(
+    null
+  );
   const isAdminOrManager =
     appUser?.role === "admin" || appUser?.role === "administrator";
 
@@ -42,7 +80,8 @@ export default function ResidentsPage() {
       getCondominium(id),
       getCondominiumRoles(id),
       getBuildingsByCondominium(id),
-    ]).then(async ([c, r, b]) => {
+      getPaymentMethodsByCondominium(id),
+    ]).then(async ([c, r, b, methods]) => {
       if (!c) {
         router.replace("/home");
         return;
@@ -50,6 +89,7 @@ export default function ResidentsPage() {
       setCondominium(c);
       setRoles(r);
       setBuildings(b);
+      setPaymentMethods(methods);
 
       const pending: Unit[] = [];
       const ownerIds = new Set<string>();
@@ -77,12 +117,43 @@ export default function ResidentsPage() {
         if (owner) ownerMap[oid] = owner;
       }
       setOwners(ownerMap);
+
+      const expenseMap: Record<string, Expense> = {};
+      const condoExpenses = await getExpensesByCondominium(id);
+      for (const exp of condoExpenses) {
+        expenseMap[exp.id] = exp;
+      }
+      const buildingExpenses = await Promise.all(
+        b.map((building) => getExpensesByBuilding(building.id))
+      );
+      for (const exps of buildingExpenses) {
+        for (const exp of exps) {
+          expenseMap[exp.id] = exp;
+        }
+      }
+      setExpenses(expenseMap);
+
+      const entriesMap: Record<string, ExpenseEntry[]> = {};
+      for (const exp of Object.values(expenseMap)) {
+        const entries = await getEntriesByExpense(exp.id);
+        for (const entry of entries) {
+          if (!entriesMap[entry.unit]) entriesMap[entry.unit] = [];
+          entriesMap[entry.unit].push(entry);
+        }
+      }
+      setEntriesByUnit(entriesMap);
+
       setLoading(false);
     });
   }, [params.id, router]);
 
   const handleReject = async (unitId: string) => {
-    if (!window.confirm("¿Rechazar esta solicitud? El usuario no podrá reclamar esta unidad por 1 semana.")) return;
+    if (
+      !window.confirm(
+        "¿Rechazar esta solicitud? El usuario no podrá reclamar esta unidad por 1 semana."
+      )
+    )
+      return;
     setRejecting(unitId);
     try {
       await rejectUnitClaim(unitId);
@@ -110,6 +181,51 @@ export default function ResidentsPage() {
     } finally {
       setVerifying(null);
     }
+  };
+
+  const handleValidatePayment = async (entryId: string, note: string) => {
+    if (!appUser) return;
+    setValidatingPaymentId(entryId);
+    try {
+      await markEntryAsPaid(entryId, {
+        notes: note,
+        validated_by: appUser.id,
+      });
+      setEntriesByUnit((prev) => {
+        const next: Record<string, ExpenseEntry[]> = {};
+        for (const [unitId, entries] of Object.entries(prev)) {
+          next[unitId] = entries.map((e) =>
+            e.id === entryId
+              ? {
+                  ...e,
+                  status: "paid",
+                  notes: note.trim() || e.notes,
+                  validated_by: appUser.id,
+                }
+              : e
+          );
+        }
+        return next;
+      });
+    } catch {
+      alert("Error al confirmar el pago");
+    } finally {
+      setValidatingPaymentId(null);
+    }
+  };
+
+  const getPendingEntriesForOwner = (ownerId: string): ExpenseEntry[] => {
+    const units = unitsByOwner[ownerId] ?? [];
+    const entries: ExpenseEntry[] = [];
+    for (const u of units) {
+      const unitEntries = entriesByUnit[u.id] ?? [];
+      entries.push(...unitEntries.filter((e) => e.status !== "paid"));
+    }
+    return entries;
+  };
+
+  const getTotalPendingForOwner = (ownerId: string): number => {
+    return getPendingEntriesForOwner(ownerId).reduce((s, e) => s + e.amount, 0);
   };
 
   if (loading) {
@@ -170,9 +286,7 @@ export default function ResidentsPage() {
             {pendingUnits.map((u) => {
               const owner = owners[u.owner];
               const building = buildings.find((b) => b.id === u.building);
-              const role = roles.find(
-                (r) => r.user === u.owner
-              );
+              const role = roles.find((r) => r.user === u.owner);
               return (
                 <div
                   key={u.id}
@@ -230,6 +344,8 @@ export default function ResidentsPage() {
             .map((r) => {
               const owner = owners[r.user] ?? null;
               const units = unitsByOwner[r.user] ?? [];
+              const pendingEntries = getPendingEntriesForOwner(r.user);
+              const totalPending = getTotalPendingForOwner(r.user);
               return (
                 <Collapse
                   key={r.id}
@@ -240,15 +356,22 @@ export default function ResidentsPage() {
                       : r.invited_email ?? ""
                   }
                   badge={
-                    <span
-                      className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider ${
-                        r.status === "verified"
-                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                          : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                      }`}
-                    >
-                      {r.status === "verified" ? "Verificado" : "Pendiente"}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {totalPending > 0 && (
+                        <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                          ${totalPending.toFixed(2)} pendiente
+                        </span>
+                      )}
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider ${
+                          r.status === "verified"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                            : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                        }`}
+                      >
+                        {r.status === "verified" ? "Verificado" : "Pendiente"}
+                      </span>
+                    </div>
                   }
                 >
                   {units.length === 0 ? (
@@ -256,42 +379,138 @@ export default function ResidentsPage() {
                       Sin unidades asignadas
                     </p>
                   ) : (
-                    <div className="flex flex-col gap-1.5">
-                      {units.map((u) => {
-                        const building = buildings.find(
-                          (b) => b.id === u.building
-                        );
-                        return (
-                          <div
-                            key={u.id}
-                            className="flex items-center gap-3 rounded-lg bg-zinc-50 px-4 py-2.5 dark:bg-zinc-900"
-                          >
-                            <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                              {building?.name ?? "?"} / {u.num}
-                            </span>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
-                                u.type === "residential"
-                                  ? "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400"
-                                  : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                              }`}
+                    <div className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        {units.map((u) => {
+                          const building = buildings.find(
+                            (b) => b.id === u.building
+                          );
+                          return (
+                            <div
+                              key={u.id}
+                              className="flex items-center gap-3 rounded-lg bg-zinc-50 px-4 py-2.5 dark:bg-zinc-900"
                             >
-                              {u.type === "residential" ? "Hab." : "Ofi."}
-                            </span>
-                            <span
-                              className={`ml-auto text-[10px] font-medium ${
-                                u.owner_status === "verified"
-                                  ? "text-emerald-600 dark:text-emerald-400"
-                                  : "text-amber-600 dark:text-amber-400"
-                              }`}
-                            >
-                              {u.owner_status === "verified"
-                                ? "Verificado"
-                                : "Pendiente"}
-                            </span>
+                              <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                                {building?.name ?? "?"} / {u.num}
+                              </span>
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+                                  u.type === "residential"
+                                    ? "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400"
+                                    : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                }`}
+                              >
+                                {u.type === "residential" ? "Hab." : "Ofi."}
+                              </span>
+                              <span
+                                className={`ml-auto text-[10px] font-medium ${
+                                  u.owner_status === "verified"
+                                    ? "text-emerald-600 dark:text-emerald-400"
+                                    : "text-amber-600 dark:text-amber-400"
+                                }`}
+                              >
+                                {u.owner_status === "verified"
+                                  ? "Verificado"
+                                  : "Pendiente"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div>
+                        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                          Pagos pendientes
+                        </h4>
+                        {pendingEntries.length === 0 ? (
+                          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                            No tiene pagos pendientes.
+                          </p>
+                        ) : (
+                          <div className="flex flex-col gap-2">
+                            {pendingEntries.map((entry) => {
+                              const expense = expenses[entry.expense];
+                              const unit = units.find((u) => u.id === entry.unit);
+                              return (
+                                <PaymentOrderItem
+                                  key={entry.id}
+                                  entry={entry}
+                                  expense={expense}
+                                  unit={unit}
+                                  building={
+                                    unit
+                                      ? buildings.find((b) => b.id === unit.building)
+                                      : undefined
+                                  }
+                                  showValidateForm
+                                  onValidate={(note) =>
+                                    handleValidatePayment(entry.id, note)
+                                  }
+                                  isValidating={validatingPaymentId === entry.id}
+                                />
+                              );
+                            })}
                           </div>
-                        );
-                      })}
+                        )}
+                      </div>
+
+                      <div>
+                        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                          Métodos de pago
+                        </h4>
+                        {paymentMethods.length === 0 ? (
+                          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                            No hay métodos de pago configurados.
+                          </p>
+                        ) : (
+                          <div className="flex flex-col gap-2">
+                            {paymentMethods.map((method) => (
+                              <div
+                                key={method.id}
+                                className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-black"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                                    {method.name}
+                                  </p>
+                                  {method.is_default && (
+                                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                      Predeterminado
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-zinc-500">
+                                  {TYPE_LABELS[method.type]}
+                                </p>
+                                <div className="mt-2 grid gap-0.5 text-xs text-zinc-700 dark:text-zinc-300">
+                                  {method.holder_name && (
+                                    <p>Titular: {method.holder_name}</p>
+                                  )}
+                                  {method.bank_name && (
+                                    <p>Banco: {method.bank_name}</p>
+                                  )}
+                                  {method.account_number && (
+                                    <p>Cuenta: {method.account_number}</p>
+                                  )}
+                                  {method.routing_number && (
+                                    <p>Routing: {method.routing_number}</p>
+                                  )}
+                                  {method.phone && <p>Teléfono: {method.phone}</p>}
+                                  {method.email && <p>Correo: {method.email}</p>}
+                                  {method.identification && (
+                                    <p>Documento: {method.identification}</p>
+                                  )}
+                                </div>
+                                {method.notes && (
+                                  <p className="mt-2 text-xs text-zinc-500">
+                                    {method.notes}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </Collapse>

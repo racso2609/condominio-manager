@@ -132,28 +132,48 @@ export default function CondominiumDetail() {
         )}
       </div>
 
-      {isAdminOrManager && (
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href={`/condominium/${condominium.id}/announcements`}
-            className="flex h-9 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
-          >
-            Anuncios
-          </Link>
-          <Link
-            href={`/condominium/${condominium.id}/invite`}
-            className="flex h-9 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
-          >
-            Invitar residentes
-          </Link>
-          <Link
-            href={`/condominium/${condominium.id}/residents`}
-            className="flex h-9 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
-          >
-            Gestionar residentes
-          </Link>
-        </div>
-      )}
+      <div className="flex flex-wrap gap-2">
+        {isAdminOrManager && (
+          <>
+            <Link
+              href={`/condominium/${condominium.id}/announcements`}
+              className="flex h-9 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            >
+              Anuncios
+            </Link>
+            <Link
+              href={`/condominium/${condominium.id}/expenses`}
+              className="flex h-9 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            >
+              Gastos
+            </Link>
+            <Link
+              href={`/condominium/${condominium.id}/invite`}
+              className="flex h-9 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            >
+              Invitar residentes
+            </Link>
+            <Link
+              href={`/condominium/${condominium.id}/residents`}
+              className="flex h-9 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            >
+              Gestionar residentes
+            </Link>
+            <Link
+              href={`/condominium/${condominium.id}/payment-methods`}
+              className="flex h-9 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            >
+              Métodos de pago
+            </Link>
+          </>
+        )}
+        <Link
+          href={`/condominium/${condominium.id}/pagos`}
+          className="flex h-9 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+        >
+          Mis pagos
+        </Link>
+      </div>
 
       {buildings.length === 0 ? (
         <section className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-black">

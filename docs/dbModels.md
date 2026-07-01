@@ -55,7 +55,8 @@ unit:
 expense:
 
 - id (PK)
-- condominium (FK → condominium.id)
+- condominium (FK → condominium.id, nullable)
+- building (FK → building.id, nullable)
 - title
 - description
 - amount
@@ -64,6 +65,8 @@ expense:
 - period_end
 - created_at
 - updated_at
+
+> One of `condominium` or `building` must be set (mutually exclusive). If `building` is set, the expense is for that specific building within the condominium. If `condominium` is set, the expense is for the entire condominium.
 
 announcement:
 

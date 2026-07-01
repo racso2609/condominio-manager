@@ -60,13 +60,33 @@ export interface Unit {
 
 export interface Expense {
   id: string;
-  condominium: string;
+  condominium?: string;
+  building?: string;
   title: string;
   description?: string;
   amount: number;
   due_date: Timestamp;
   period_start?: Timestamp;
   period_end?: Timestamp;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface ExpenseEntry {
+  id: string;
+  expense: string;
+  unit: string;
+  amount: number;
+  status: "pending" | "pending_validation" | "paid" | "overdue";
+  paid_at: Timestamp | null;
+  payment_method_id?: string | null;
+  payment_reference?: string | null;
+  payment_proof_url?: string | null;
+  notes?: string | null;
+  reported_by?: string | null;
+  reported_at?: Timestamp | null;
+  validated_by?: string | null;
+  validated_at?: Timestamp | null;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -84,6 +104,33 @@ export interface Announcement {
   content: string;
   files?: AnnouncementFile[];
   author: string;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export type PaymentMethodType =
+  | "bank_transfer"
+  | "mobile_payment"
+  | "zelle"
+  | "paypal"
+  | "venmo"
+  | "cash"
+  | "other";
+
+export interface PaymentMethod {
+  id: string;
+  condominium: string;
+  name: string;
+  type: PaymentMethodType;
+  holder_name?: string;
+  bank_name?: string;
+  account_number?: string;
+  routing_number?: string;
+  phone?: string;
+  email?: string;
+  identification?: string;
+  notes?: string;
+  is_default: boolean;
   created_at: Timestamp;
   updated_at: Timestamp;
 }

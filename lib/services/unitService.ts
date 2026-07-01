@@ -89,6 +89,12 @@ export async function getUnitsByBuilding(buildingId: string): Promise<Unit[]> {
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Unit);
 }
 
+export async function getUnit(id: string): Promise<Unit | null> {
+  const snap = await getDoc(doc(db, COLLECTION, id));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() } as Unit;
+}
+
 export async function deleteUnit(id: string): Promise<void> {
   await deleteDoc(doc(db, COLLECTION, id));
 }

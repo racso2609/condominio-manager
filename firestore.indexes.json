@@ -7,6 +7,36 @@
         { "fieldPath": "condominium", "order": "ASCENDING" },
         { "fieldPath": "created_at", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "expenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "condominium", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "expenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "building", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "expense_entries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "expense", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "expense_entries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "unit", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
