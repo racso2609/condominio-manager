@@ -24,6 +24,7 @@ import {
   AppUser,
   ComplaintStatus,
   Unit,
+  Building,
 } from "@/lib/types";
 
 const STATUS_LABELS: Record<ComplaintStatus, string> = {
@@ -41,10 +42,18 @@ const STATUS_COLORS: Record<ComplaintStatus, string> = {
     "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
 };
 
-function formatUnits(units: Unit[]): string {
+function formatUnits(
+  units: Unit[],
+  buildings: Record<string, Building>
+): string {
   if (units.length === 0) return "";
-  const nums = units.map((u) => u.num).sort();
-  return nums.length === 1 ? `Apto ${nums[0]}` : `Aptos ${nums.join(", ")}`;
+  const labels = units
+    .map((u) => {
+      const symbol = buildings[u.building]?.symbol ?? "";
+      return `${u.num}${symbol}`;
+    })
+    .sort();
+  return labels.length === 1 ? `Apto ${labels[0]}` : `Aptos ${labels.join(", ")}`;
 }
 
 export default function ComplaintsPage() {
@@ -56,6 +65,7 @@ export default function ComplaintsPage() {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [authors, setAuthors] = useState<Record<string, AppUser>>({});
   const [authorUnits, setAuthorUnits] = useState<Record<string, Unit[]>>({});
+  const [buildingsMap, setBuildingsMap] = useState<Record<string, Building>>({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [resolutionNotes, setResolutionNotes] = useState<Record<string, string>>({});
@@ -99,6 +109,9 @@ export default function ComplaintsPage() {
       const map: Record<string, AppUser> = {};
       const unitMap: Record<string, Unit[]> = {};
       const buildingIds = new Set(buildings.map((b) => b.id));
+      const buildingMap: Record<string, Building> = {};
+      for (const b of buildings) buildingMap[b.id] = b;
+      setBuildingsMap(buildingMap);
 
       for (const uid of ids) {
         const u = await getUser(uid);
@@ -215,7 +228,7 @@ export default function ComplaintsPage() {
           {complaints.map((complaint) => {
             const author = authors[complaint.author];
             const units = authorUnits[complaint.author];
-            const unitsText = units ? formatUnits(units) : "";
+            const unitsText = units ? formatUnits(units, buildingsMap) : "";
             const images =
               complaint.files?.filter((f) => f.type === "image") ?? [];
             const docs =
