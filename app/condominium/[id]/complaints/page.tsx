@@ -84,15 +84,13 @@ export default function ComplaintsPage() {
 
       setComplaints(data);
 
-      if (canManage) {
-        const ids = new Set(data.map((c) => c.author));
-        const map: Record<string, AppUser> = {};
-        for (const uid of ids) {
-          const u = await getUser(uid);
-          if (u) map[uid] = u;
-        }
-        setAuthors(map);
+      const ids = new Set(data.map((c) => c.author));
+      const map: Record<string, AppUser> = {};
+      for (const uid of ids) {
+        const u = await getUser(uid);
+        if (u) map[uid] = u;
       }
+      setAuthors(map);
 
       setLoading(false);
     };
@@ -221,9 +219,7 @@ export default function ComplaintsPage() {
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-zinc-500">
-                      {canManage
-                        ? `${author?.name ?? "Desconocido"} · `
-                        : ""}
+                      {author?.name ?? "Desconocido"} ·{" "}
                       {complaint.created_at.toDate().toLocaleDateString()}
                     </p>
                   </div>
