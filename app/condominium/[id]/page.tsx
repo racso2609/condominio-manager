@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
-import { getCondominium, updateCondominiumStatus, getUserCondominiumRole } from "@/lib/services/condominiumService";
-import { getBuildingsByCondominium } from "@/lib/services/buildingService";
-import { getUnitsByBuilding } from "@/lib/services/unitService";
-import { getEntriesByUnits } from "@/lib/services/expenseEntryService";
-import { Condominium, Building, Unit, ExpenseEntry, CondominiumRole } from "@/lib/types";
+import { useCondominium, useUserCondominiumRole } from "@/lib/queries/useCondominium";
+import { useBuildingsByCondominium } from "@/lib/queries/useBuilding";
+import { useUnitsByBuildings } from "@/lib/queries/useUnit";
+import { useEntriesByUnits } from "@/lib/queries/useExpenseEntry";
+import { useUpdateCondominiumStatus } from "@/lib/mutations/useCondominiumMutations";
 import StatusBadge from "@/components/StatusBadge";
 import { CondominiumDetailSkeleton } from "@/components/skeleton";
 
@@ -17,50 +17,39 @@ export default function CondominiumDetail() {
   const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
-  const [condominium, setCondominium] = useState<Condominium | null>(null);
-  const [buildings, setBuildings] = useState<Building[]>([]);
-  const [units, setUnits] = useState<Unit[]>([]);
-  const [entries, setEntries] = useState<ExpenseEntry[]>([]);
-  const [userRole, setUserRole] = useState<CondominiumRole | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [changingStatus, setChangingStatus] = useState(false);
+  const condominiumId = params.id as string;
+
+  const { data: condominium, isLoading: condominiumLoading } =
+    useCondominium(condominiumId);
+  const { data: buildings = [], isLoading: buildingsLoading } =
+    useBuildingsByCondominium(condominiumId);
+  const { data: userRole, isLoading: roleLoading } = useUserCondominiumRole(
+    appUser?.id,
+    condominiumId
+  );
+
+  const buildingIds = useMemo(() => buildings.map((b) => b.id), [buildings]);
+  const unitsQueries = useUnitsByBuildings(buildingIds);
+
+  const units = useMemo(() => {
+    return unitsQueries.flatMap((q) => q.data ?? []);
+  }, [unitsQueries]);
+
+  const unitIds = useMemo(() => units.map((u) => u.id), [units]);
+  const { data: entries = [], isLoading: entriesLoading } =
+    useEntriesByUnits(unitIds);
+
+  const { mutate: updateStatus, isPending: changingStatus } =
+    useUpdateCondominiumStatus();
+
   const isAdminOrManager =
     appUser?.role === "admin" || appUser?.role === "administrator";
 
-  const fetchData = async () => {
-    if (!params.id) return;
-    const id = params.id as string;
-    const [c, b, role] = await Promise.all([
-      getCondominium(id),
-      getBuildingsByCondominium(id),
-      appUser ? getUserCondominiumRole(appUser.id, id) : Promise.resolve(null),
-    ]);
-    if (!c) {
-      router.replace("/home");
-      setLoading(false);
-      return;
-    }
-    setCondominium(c);
-    setBuildings(b);
-    setUserRole(role);
-
-    const allUnits = (
-      await Promise.all(b.map((building) => getUnitsByBuilding(building.id)))
-    ).flat();
-    setUnits(allUnits);
-
-    if (allUnits.length > 0) {
-      const unitIds = allUnits.map((u) => u.id);
-      const expenseEntries = await getEntriesByUnits(unitIds);
-      setEntries(expenseEntries);
-    }
-
-    setLoading(false);
-  };
-
   useEffect(() => {
-    fetchData();
-  }, [params.id, router, appUser]);
+    if (!condominiumLoading && condominium === null) {
+      router.replace("/home");
+    }
+  }, [condominiumLoading, condominium, router]);
 
   const handleToggleStatus = async () => {
     if (!condominium || !appUser) return;
@@ -71,8 +60,8 @@ export default function CondominiumDetail() {
         alert("El condominio debe tener al menos un edificio.");
         return;
       }
-      const unitCounts = await Promise.all(
-        buildings.map((b) => getUnitsByBuilding(b.id).then((u) => u.length))
+      const unitCounts = unitsQueries.map(
+        (q) => q.data?.length ?? 0
       );
       const hasEmptyBuilding = unitCounts.some((count) => count === 0);
       if (hasEmptyBuilding) {
@@ -81,22 +70,19 @@ export default function CondominiumDetail() {
       }
     }
 
-    setChangingStatus(true);
-    try {
-      await updateCondominiumStatus(condominium.id, targetStatus);
-      setCondominium((prev) => prev ? { ...prev, status: targetStatus } : prev);
-    } catch {
-      alert("Error al cambiar el estado");
-    } finally {
-      setChangingStatus(false);
-    }
+    updateStatus({ id: condominium.id, status: targetStatus });
   };
 
-  if (loading) {
+  const loading =
+    condominiumLoading ||
+    buildingsLoading ||
+    roleLoading ||
+    entriesLoading ||
+    unitsQueries.some((q) => q.isLoading);
+
+  if (loading || !condominium) {
     return <CondominiumDetailSkeleton />;
   }
-
-  if (!condominium) return null;
 
   const pendingAmount = entries
     .filter((e) => e.status === "pending" || e.status === "pending_validation")
@@ -105,7 +91,10 @@ export default function CondominiumDetail() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
       <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-        <Link href="/home" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+        <Link
+          href="/home"
+          className="hover:text-zinc-700 dark:hover:text-zinc-200"
+        >
           Mis condominios
         </Link>
         <span>/</span>
@@ -166,10 +155,14 @@ export default function CondominiumDetail() {
             Reclama tu unidad o apartamento
           </h2>
           <p className="mt-1 text-sm text-amber-700 dark:text-amber-200/80">
-            Para acceder a tus pagos, reportar pagos y usar todas las funcionalidades de residente, necesitas reclamar una unidad o apartamento en este condominio.
+            Para acceder a tus pagos, reportar pagos y usar todas las
+            funcionalidades de residente, necesitas reclamar una unidad o
+            apartamento en este condominio.
           </p>
           <p className="mt-2 text-sm text-amber-700 dark:text-amber-200/80">
-            Selecciona un edificio debajo y presiona <strong>Reclamar</strong> en la unidad que te corresponde. Un administrador validará tu solicitud.
+            Selecciona un edificio debajo y presiona <strong>Reclamar</strong>{" "}
+            en la unidad que te corresponde. Un administrador validará tu
+            solicitud.
           </p>
         </section>
       )}
@@ -254,7 +247,7 @@ export default function CondominiumDetail() {
         <section className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-black">
           <p className="text-zinc-500 dark:text-zinc-400">
             {isAdminOrManager
-              ? "Usa el botón \"Añadir edificio\" para comenzar a registrar los edificios de este condominio."
+              ? 'Usa el botón "Añadir edificio" para comenzar a registrar los edificios de este condominio.'
               : "No hay edificios disponibles en este momento."}
           </p>
         </section>

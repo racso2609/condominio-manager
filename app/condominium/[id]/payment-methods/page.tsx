@@ -1,16 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
-import { getCondominium } from "@/lib/services/condominiumService";
-import {
-  getPaymentMethodsByCondominium,
-  deletePaymentMethod,
-} from "@/lib/services/paymentMethodService";
-import { Condominium, PaymentMethod, PaymentMethodType } from "@/lib/types";
+import { useCondominium } from "@/lib/queries/useCondominium";
+import { usePaymentMethodsByCondominium } from "@/lib/queries/usePaymentMethod";
+import { useDeletePaymentMethod } from "@/lib/mutations/usePaymentMethodMutations";
+import { PaymentMethodType } from "@/lib/types";
 import { PageSkeleton } from "@/components/skeleton";
 
 const TYPE_LABELS: Record<PaymentMethodType, string> = {
@@ -27,42 +25,33 @@ export default function PaymentMethodsPage() {
   const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
-  const [condominium, setCondominium] = useState<Condominium | null>(null);
-  const [methods, setMethods] = useState<PaymentMethod[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const condominiumId = params.id as string;
+
+  const { data: condominium, isLoading: condominiumLoading } =
+    useCondominium(condominiumId);
+  const { data: methods = [], isLoading: methodsLoading } =
+    usePaymentMethodsByCondominium(condominiumId);
+
+  const { mutate: deletePaymentMethod, isPending: isDeleting } =
+    useDeletePaymentMethod();
+
   const isAdminOrManager =
     appUser?.role === "admin" || appUser?.role === "administrator";
 
   useEffect(() => {
-    if (!params.id) return;
-    const id = params.id as string;
-    Promise.all([getCondominium(id), getPaymentMethodsByCondominium(id)]).then(
-      ([c, mths]) => {
-        if (!c) {
-          router.replace("/home");
-          return;
-        }
-        setCondominium(c);
-        setMethods(mths);
-        setLoading(false);
-      }
-    );
-  }, [params.id, router]);
+    if (!condominiumLoading && condominium === null) {
+      router.replace("/home");
+    }
+  }, [condominiumLoading, condominium, router]);
 
-  const handleDelete = async (methodId: string) => {
+  const handleDelete = (methodId: string) => {
     if (!confirm("¿Estás seguro de que deseas eliminar este método de pago?"))
       return;
-    setDeletingId(methodId);
-    try {
-      await deletePaymentMethod(methodId);
-      setMethods((prev) => prev.filter((m) => m.id !== methodId));
-    } catch {
-      alert("Error al eliminar el método de pago");
-    } finally {
-      setDeletingId(null);
-    }
+
+    deletePaymentMethod(methodId);
   };
+
+  const loading = condominiumLoading || methodsLoading;
 
   if (loading) {
     return <PageSkeleton titleWidth="w-48" cardCount={3} cardLines={3} />;
@@ -83,7 +72,10 @@ export default function PaymentMethodsPage() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
       <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-        <Link href="/home" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+        <Link
+          href="/home"
+          className="hover:text-zinc-700 dark:hover:text-zinc-200"
+        >
           Mis condominios
         </Link>
         <span>/</span>
@@ -199,12 +191,12 @@ export default function PaymentMethodsPage() {
                 <Button
                   type="button"
                   onClick={() => handleDelete(method.id)}
-                  disabled={deletingId === method.id}
+                  disabled={isDeleting}
                   variant="ghost"
                   size="sm"
                   className="h-auto px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/20"
                 >
-                  {deletingId === method.id ? "..." : "Eliminar"}
+                  {isDeleting ? "..." : "Eliminar"}
                 </Button>
               </div>
             </div>

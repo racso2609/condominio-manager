@@ -1,72 +1,70 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
 import { Button } from "@/components/Button";
-import { getCondominium } from "@/lib/services/condominiumService";
-import {
-  getAnnouncementsByCondominium,
-  deleteAnnouncement,
-} from "@/lib/services/announcementService";
-import { getUser } from "@/lib/services/userService";
-import { Condominium, Announcement, AppUser } from "@/lib/types";
+import { useCondominium } from "@/lib/queries/useCondominium";
+import { useAnnouncementsByCondominium } from "@/lib/queries/useAnnouncement";
+import { useUsers } from "@/lib/queries/useUser";
+import { useDeleteAnnouncement } from "@/lib/mutations/useAnnouncementMutations";
+import { Announcement } from "@/lib/types";
 import { PageSkeleton } from "@/components/skeleton";
 
 export default function AnnouncementsPage() {
   const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
-  const [condominium, setCondominium] = useState<Condominium | null>(null);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [authors, setAuthors] = useState<Record<string, AppUser>>({});
-  const [loading, setLoading] = useState(true);
+  const condominiumId = params.id as string;
+
+  const { data: condominium, isLoading: condominiumLoading } =
+    useCondominium(condominiumId);
+  const { data: announcements = [], isLoading: announcementsLoading } =
+    useAnnouncementsByCondominium(condominiumId);
+
+  const authorIds = useMemo(
+    () => Array.from(new Set(announcements.map((a) => a.author))),
+    [announcements]
+  );
+  const usersQueries = useUsers(authorIds);
+
+  const authors = useMemo(() => {
+    const map: Record<string, import("@/lib/types").AppUser> = {};
+    usersQueries.forEach((q) => {
+      if (q.data) map[q.data.id] = q.data;
+    });
+    return map;
+  }, [usersQueries]);
+
+  const { mutate: deleteAnnouncement, isPending: isDeleting } =
+    useDeleteAnnouncement();
+
   const isAdminOrManager =
     appUser?.role === "admin" || appUser?.role === "administrator";
 
   useEffect(() => {
-    if (!params.id) return;
-    const id = params.id as string;
-    Promise.all([getCondominium(id), getAnnouncementsByCondominium(id)]).then(
-      async ([c, a]) => {
-        if (!c) router.replace("/home");
-        else {
-          setCondominium(c);
-          setAnnouncements(a);
-          const ids = new Set(a.map((ann) => ann.author));
-          const map: Record<string, AppUser> = {};
-          for (const uid of ids) {
-            const u = await getUser(uid);
-            if (u) map[uid] = u;
-          }
-          setAuthors(map);
-        }
-        setLoading(false);
-      },
-    );
-  }, [params.id, router]);
+    if (!condominiumLoading && condominium === null) {
+      router.replace("/home");
+    }
+  }, [condominiumLoading, condominium, router]);
 
-  const handleDelete = async (announcement: Announcement) => {
+  const handleDelete = (announcement: Announcement) => {
     if (
       !window.confirm(
-        `¿Eliminar "${announcement.title}"? Esta acción no se puede deshacer.`,
+        `¿Eliminar "${announcement.title}"? Esta acción no se puede deshacer.`
       )
     )
       return;
-    try {
-      await deleteAnnouncement(announcement.id, params.id as string);
-      setAnnouncements((prev) => prev.filter((a) => a.id !== announcement.id));
-    } catch {
-      alert("Error al eliminar");
-    }
+
+    deleteAnnouncement({ id: announcement.id, condominiumId });
   };
 
-  if (loading) {
+  const loading = condominiumLoading || announcementsLoading;
+
+  if (loading || !condominium) {
     return <PageSkeleton titleWidth="w-40" cardCount={3} cardLines={4} />;
   }
-
-  if (!condominium) return null;
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
@@ -138,7 +136,8 @@ export default function AnnouncementsPage() {
                   {isAdminOrManager && (
                     <button
                       onClick={() => handleDelete(ann)}
-                      className="text-xs font-medium text-red-500 hover:text-red-700"
+                      disabled={isDeleting}
+                      className="text-xs font-medium text-red-500 hover:text-red-700 disabled:opacity-50"
                     >
                       Eliminar
                     </button>

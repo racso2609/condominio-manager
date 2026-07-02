@@ -1,31 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import {
-  getUserCondominiums,
-  getPendingInvitesByEmail,
-  getCondominium,
-} from "@/lib/services/condominiumService";
-import { getAnnouncementsByCondominium } from "@/lib/services/announcementService";
-import { getComplaintsByCondominium } from "@/lib/services/complaintService";
-import { getUser } from "@/lib/services/userService";
-import { getUnitsByOwner } from "@/lib/services/unitService";
-import { getBuilding } from "@/lib/services/buildingService";
+  useUserCondominiums,
+  usePendingInvitesByEmail,
+} from "@/lib/queries/useCondominium";
+import { useAnnouncementsByCondominiums } from "@/lib/queries/useAnnouncement";
+import { useComplaintsByCondominiums } from "@/lib/queries/useComplaint";
+import { useUnitsByOwner } from "@/lib/queries/useUnit";
+import { useBuildings } from "@/lib/queries/useBuilding";
+import { useEntriesByUnits } from "@/lib/queries/useExpenseEntry";
 import {
-  getExpensesByCondominium,
-  getExpensesByBuilding,
-} from "@/lib/services/expenseService";
-import { getEntriesByUnits } from "@/lib/services/expenseEntryService";
+  useExpensesByCondominiums,
+  useExpensesByBuildings,
+} from "@/lib/queries/useExpense";
+import { useUsers } from "@/lib/queries/useUser";
 import {
+  AppUser,
+  Announcement,
+  Building,
+  Complaint,
   Condominium,
   CondominiumRole,
-  Announcement,
-  AppUser,
+  Expense,
   ExpenseEntry,
   Unit,
-  Building,
-  Expense,
-  Complaint,
 } from "@/lib/types";
 
 interface UseHomeDataResult {
@@ -44,155 +43,147 @@ interface UseHomeDataResult {
 }
 
 export function useHomeData(appUser: AppUser | undefined): UseHomeDataResult {
-  const [condominiums, setCondominiums] = useState<Condominium[]>([]);
-  const [pendingInvites, setPendingInvites] = useState<CondominiumRole[]>([]);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [announcementAuthors, setAnnouncementAuthors] = useState<
-    Record<string, AppUser>
-  >({});
-  const [complaints, setComplaints] = useState<Complaint[]>([]);
-  const [complaintAuthors, setComplaintAuthors] = useState<
-    Record<string, AppUser>
-  >({});
-  const [condominiumNames, setCondominiumNames] = useState<
-    Record<string, string>
-  >({});
-  const [paymentEntries, setPaymentEntries] = useState<ExpenseEntry[]>([]);
-  const [paymentUnits, setPaymentUnits] = useState<Record<string, Unit>>({});
-  const [paymentBuildings, setPaymentBuildings] = useState<
-    Record<string, Building>
-  >({});
-  const [paymentExpenses, setPaymentExpenses] = useState<
-    Record<string, Expense>
-  >({});
-  const [loading, setLoading] = useState(true);
+  const { data: condominiums = [], isLoading: condominiumsLoading } =
+    useUserCondominiums(appUser?.id, appUser?.role);
 
-  useEffect(() => {
-    if (!appUser) return;
+  const { data: pendingInvites = [], isLoading: invitesLoading } =
+    usePendingInvitesByEmail(appUser?.email);
 
-    Promise.all([
-      getUserCondominiums(appUser.id, appUser.role),
-      getPendingInvitesByEmail(appUser.email),
-    ]).then(async ([list, invites]) => {
-      setCondominiums(list);
-      setPendingInvites(invites);
+  const { data: userUnits = [], isLoading: unitsLoading } = useUnitsByOwner(
+    appUser?.id
+  );
 
-      const condoIds = list.map((c) => c.id);
+  const condominiumIds = useMemo(
+    () => condominiums.map((c) => c.id),
+    [condominiums]
+  );
 
-      const [allAnnouncements, allComplaints, userUnits] = await Promise.all([
-        (async () => {
-          const anns: Announcement[] = [];
-          for (const c of list) {
-            const condoAnns = await getAnnouncementsByCondominium(c.id);
-            anns.push(...condoAnns);
-          }
-          anns.sort(
-            (a, b) => b.created_at.toMillis() - a.created_at.toMillis()
-          );
-          return anns;
-        })(),
-        (async () => {
-          const comps: Complaint[] = [];
-          for (const c of list) {
-            const condoComps = await getComplaintsByCondominium(c.id);
-            comps.push(...condoComps);
-          }
-          return comps;
-        })(),
-        getUnitsByOwner(appUser.id),
-      ]);
-      setAnnouncements(allAnnouncements);
+  const announcementsQueries =
+    useAnnouncementsByCondominiums(condominiumIds);
+  const complaintsQueries = useComplaintsByCondominiums(condominiumIds);
 
-      allComplaints.sort(
-        (a, b) => b.created_at.toMillis() - a.created_at.toMillis()
-      );
-      setComplaints(allComplaints);
+  const buildingIds = useMemo(
+    () => Array.from(new Set(userUnits.map((u) => u.building))),
+    [userUnits]
+  );
 
-      const authorIds = new Set<string>();
-      const announcementCondoIds = new Set<string>();
-      allAnnouncements.forEach((a) => {
-        authorIds.add(a.author);
-        announcementCondoIds.add(a.condominium);
-      });
-      allComplaints.forEach((c) => {
-        authorIds.add(c.author);
-      });
+  const buildingsQueries = useBuildings(buildingIds);
 
-      const buildingIds = new Set(userUnits.map((u) => u.building));
-      const buildingMap: Record<string, Building> = {};
-      for (const bid of buildingIds) {
-        const b = await getBuilding(bid);
-        if (b) buildingMap[bid] = b;
-      }
-      setPaymentBuildings(buildingMap);
-
-      const ownedUnitsInCondos = userUnits.filter((u) => {
-        const b = buildingMap[u.building];
-        return b && condoIds.includes(b.condominium);
-      });
-
-      const unitMap: Record<string, Unit> = {};
-      ownedUnitsInCondos.forEach((u) => {
-        unitMap[u.id] = u;
-      });
-      setPaymentUnits(unitMap);
-
-      if (ownedUnitsInCondos.length > 0) {
-        const ownedUnitIds = ownedUnitsInCondos.map((u) => u.id);
-        const entries = await getEntriesByUnits(ownedUnitIds);
-        setPaymentEntries(entries);
-
-        const expenseMap: Record<string, Expense> = {};
-        for (const c of list) {
-          const exps = await getExpensesByCondominium(c.id);
-          for (const e of exps) expenseMap[e.id] = e;
-        }
-        for (const bid of buildingIds) {
-          const exps = await getExpensesByBuilding(bid);
-          for (const e of exps) expenseMap[e.id] = e;
-        }
-        setPaymentExpenses(expenseMap);
-      }
-
-      const names: Record<string, string> = {};
-      for (const cid of condoIds) {
-        const c = list.find((c) => c.id === cid);
-        if (c) names[cid] = c.name;
-        else {
-          const fetched = await getCondominium(cid);
-          if (fetched) names[cid] = fetched.name;
-        }
-      }
-      for (const cid of announcementCondoIds) {
-        if (names[cid]) continue;
-        const fetched = await getCondominium(cid);
-        if (fetched) names[cid] = fetched.name;
-      }
-      setCondominiumNames(names);
-
-      const map: Record<string, AppUser> = {};
-      for (const uid of authorIds) {
-        const u = await getUser(uid);
-        if (u) map[uid] = u;
-      }
-      setAnnouncementAuthors(map);
-      setComplaintAuthors(map);
-      setLoading(false);
+  const buildingMap = useMemo(() => {
+    const map: Record<string, Building> = {};
+    buildingsQueries.forEach((q) => {
+      if (q.data) map[q.data.id] = q.data;
     });
-  }, [appUser]);
+    return map;
+  }, [buildingsQueries]);
+
+  const ownedUnitsInCondos = useMemo(() => {
+    return userUnits.filter((u) => {
+      const b = buildingMap[u.building];
+      return b && condominiumIds.includes(b.condominium);
+    });
+  }, [userUnits, buildingMap, condominiumIds]);
+
+  const ownedUnitIds = useMemo(
+    () => ownedUnitsInCondos.map((u) => u.id),
+    [ownedUnitsInCondos]
+  );
+
+  const unitMap = useMemo(() => {
+    const map: Record<string, Unit> = {};
+    ownedUnitsInCondos.forEach((u) => {
+      map[u.id] = u;
+    });
+    return map;
+  }, [ownedUnitsInCondos]);
+
+  const { data: paymentEntries = [], isLoading: entriesLoading } =
+    useEntriesByUnits(ownedUnitIds);
+
+  const expensesByCondominiumQueries =
+    useExpensesByCondominiums(condominiumIds);
+  const expensesByBuildingQueries = useExpensesByBuildings(buildingIds);
+
+  const allAnnouncements = useMemo(() => {
+    const items: Announcement[] = [];
+    announcementsQueries.forEach((q) => {
+      if (q.data) items.push(...q.data);
+    });
+    return items.sort(
+      (a, b) => b.created_at.toMillis() - a.created_at.toMillis()
+    );
+  }, [announcementsQueries]);
+
+  const allComplaints = useMemo(() => {
+    const items: Complaint[] = [];
+    complaintsQueries.forEach((q) => {
+      if (q.data) items.push(...q.data);
+    });
+    return items.sort(
+      (a, b) => b.created_at.toMillis() - a.created_at.toMillis()
+    );
+  }, [complaintsQueries]);
+
+  const expenseMap = useMemo(() => {
+    const map: Record<string, Expense> = {};
+    expensesByCondominiumQueries.forEach((q) => {
+      if (q.data) q.data.forEach((e) => (map[e.id] = e));
+    });
+    expensesByBuildingQueries.forEach((q) => {
+      if (q.data) q.data.forEach((e) => (map[e.id] = e));
+    });
+    return map;
+  }, [expensesByCondominiumQueries, expensesByBuildingQueries]);
+
+  const authorIds = useMemo(() => {
+    const ids = new Set<string>();
+    allAnnouncements.forEach((a) => ids.add(a.author));
+    allComplaints.forEach((c) => ids.add(c.author));
+    return Array.from(ids);
+  }, [allAnnouncements, allComplaints]);
+
+  const usersQueries = useUsers(authorIds);
+
+  const authorMap = useMemo(() => {
+    const map: Record<string, AppUser> = {};
+    usersQueries.forEach((q) => {
+      if (q.data) map[q.data.id] = q.data;
+    });
+    return map;
+  }, [usersQueries]);
+
+  const condominiumNames = useMemo(() => {
+    const names: Record<string, string> = {};
+    condominiums.forEach((c) => {
+      names[c.id] = c.name;
+    });
+    return names;
+  }, [condominiums]);
+
+  const loading =
+    condominiumsLoading ||
+    invitesLoading ||
+    unitsLoading ||
+    entriesLoading ||
+    announcementsQueries.some((q) => q.isLoading) ||
+    complaintsQueries.some((q) => q.isLoading) ||
+    buildingsQueries.some((q) => q.isLoading) ||
+    expensesByCondominiumQueries.some((q) => q.isLoading) ||
+    expensesByBuildingQueries.some((q) => q.isLoading) ||
+    usersQueries.some((q) => q.isLoading);
 
   return {
     condominiums,
     pendingInvites,
-    announcements,
-    announcementAuthors,
-    complaints,
-    complaintAuthors,
+    announcements: allAnnouncements,
+    announcementAuthors: authorMap,
+    complaints: allComplaints,
+    complaintAuthors: authorMap,
     condominiumNames,
     paymentEntries,
-    paymentUnits,
-    paymentBuildings,
-    paymentExpenses,
+    paymentUnits: unitMap,
+    paymentBuildings: buildingMap,
+    paymentExpenses: expenseMap,
     loading,
   };
 }

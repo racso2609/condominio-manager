@@ -1,27 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
 import { Button } from "@/components/Button";
+import { useCondominium, useUserCondominiumRole } from "@/lib/queries/useCondominium";
+import { useComplaintsByCondominium } from "@/lib/queries/useComplaint";
+import { useBuildingsByCondominium } from "@/lib/queries/useBuilding";
+import { useUnitsByOwners } from "@/lib/queries/useUnit";
+import { useUsers } from "@/lib/queries/useUser";
 import {
-  getCondominium,
-  getUserCondominiumRole,
-} from "@/lib/services/condominiumService";
-import {
-  getComplaintsByCondominium,
-  updateComplaintStatus,
-  deleteComplaint,
-} from "@/lib/services/complaintService";
-import { getUser } from "@/lib/services/userService";
-import { getBuildingsByCondominium } from "@/lib/services/buildingService";
-import { getUnitsByOwner } from "@/lib/services/unitService";
+  useUpdateComplaintStatus,
+  useDeleteComplaint,
+} from "@/lib/mutations/useComplaintMutations";
 import {
   Complaint,
-  Condominium,
-  CondominiumRole,
-  AppUser,
   ComplaintStatus,
   Unit,
   Building,
@@ -61,118 +55,126 @@ export default function ComplaintsPage() {
   const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
-  const [condominium, setCondominium] = useState<Condominium | null>(null);
-  const [userRole, setUserRole] = useState<CondominiumRole | null>(null);
-  const [complaints, setComplaints] = useState<Complaint[]>([]);
-  const [authors, setAuthors] = useState<Record<string, AppUser>>({});
-  const [authorUnits, setAuthorUnits] = useState<Record<string, Unit[]>>({});
-  const [buildingsMap, setBuildingsMap] = useState<Record<string, Building>>({});
-  const [loading, setLoading] = useState(true);
-  const [savingId, setSavingId] = useState<string | null>(null);
+  const condominiumId = params.id as string;
+
+  const { data: condominium, isLoading: condominiumLoading } =
+    useCondominium(condominiumId);
+  const { data: userRole, isLoading: roleLoading } = useUserCondominiumRole(
+    appUser?.id,
+    condominiumId
+  );
+  const { data: complaints = [], isLoading: complaintsLoading } =
+    useComplaintsByCondominium(condominiumId);
+  const { data: buildings = [], isLoading: buildingsLoading } =
+    useBuildingsByCondominium(condominiumId);
+
+  const authorIds = useMemo(
+    () => Array.from(new Set(complaints.map((c) => c.author))),
+    [complaints]
+  );
+
+  const usersQueries = useUsers(authorIds);
+  const authorUnitsQueries = useUnitsByOwners(authorIds);
+
+  const authors = useMemo(() => {
+    const map: Record<string, import("@/lib/types").AppUser> = {};
+    usersQueries.forEach((q) => {
+      if (q.data) map[q.data.id] = q.data;
+    });
+    return map;
+  }, [usersQueries]);
+
+  const buildingsMap = useMemo(() => {
+    const map: Record<string, Building> = {};
+    buildings.forEach((b) => {
+      map[b.id] = b;
+    });
+    return map;
+  }, [buildings]);
+
+  const buildingIds = useMemo(
+    () => new Set(buildings.map((b) => b.id)),
+    [buildings]
+  );
+
+  const authorUnits = useMemo(() => {
+    const map: Record<string, Unit[]> = {};
+    authorUnitsQueries.forEach((q, index) => {
+      const userId = authorIds[index];
+      if (!userId || !q.data) return;
+      const inCondo = q.data.filter((unit) => buildingIds.has(unit.building));
+      if (inCondo.length > 0) map[userId] = inCondo;
+    });
+    return map;
+  }, [authorUnitsQueries, authorIds, buildingIds]);
+
   const [resolutionNotes, setResolutionNotes] = useState<Record<string, string>>({});
+
+  const { mutate: updateStatus, isPending: isUpdatingStatus } =
+    useUpdateComplaintStatus();
+  const { mutate: deleteComplaint, isPending: isDeleting } =
+    useDeleteComplaint();
 
   const isGlobalAdmin = appUser?.role === "admin";
   const isCondoAdmin = userRole?.role === "administrator";
   const canManage = isGlobalAdmin || isCondoAdmin;
   const canCreate =
-    isGlobalAdmin ||
-    (userRole?.role === "resident" && !!userRole?.user);
+    isGlobalAdmin || (userRole?.role === "resident" && !!userRole?.user);
 
   useEffect(() => {
-    if (!params.id || !appUser) return;
-    const id = params.id as string;
+    if (condominiumLoading || roleLoading) return;
+    if (condominium === null) {
+      router.replace("/home");
+      return;
+    }
+    if (!isGlobalAdmin && !userRole) {
+      router.replace("/home");
+    }
+  }, [
+    condominiumLoading,
+    roleLoading,
+    condominium,
+    userRole,
+    isGlobalAdmin,
+    router,
+  ]);
 
-    const load = async () => {
-      const [condo, role, buildings] = await Promise.all([
-        getCondominium(id),
-        getUserCondominiumRole(appUser.id, id),
-        getBuildingsByCondominium(id),
-      ]);
-
-      if (!condo) {
-        router.replace("/home");
-        return;
-      }
-
-      if (!isGlobalAdmin && !role) {
-        router.replace("/home");
-        return;
-      }
-
-      setCondominium(condo);
-      setUserRole(role);
-
-      const data = await getComplaintsByCondominium(id);
-
-      setComplaints(data);
-
-      const ids = new Set(data.map((c) => c.author));
-      const map: Record<string, AppUser> = {};
-      const unitMap: Record<string, Unit[]> = {};
-      const buildingIds = new Set(buildings.map((b) => b.id));
-      const buildingMap: Record<string, Building> = {};
-      for (const b of buildings) buildingMap[b.id] = b;
-      setBuildingsMap(buildingMap);
-
-      for (const uid of ids) {
-        const u = await getUser(uid);
-        if (u) map[uid] = u;
-
-        const units = await getUnitsByOwner(uid);
-        const inCondo = units.filter((unit) => buildingIds.has(unit.building));
-        if (inCondo.length > 0) unitMap[uid] = inCondo;
-      }
-      setAuthors(map);
-      setAuthorUnits(unitMap);
-
-      setLoading(false);
-    };
-
-    load();
-  }, [params.id, router, appUser, canManage, isGlobalAdmin]);
-
-  const handleStatusChange = async (
+  const handleStatusChange = (
     complaint: Complaint,
     status: ComplaintStatus
   ) => {
     if (!appUser) return;
-    setSavingId(complaint.id);
-    try {
-      await updateComplaintStatus(
-        complaint.id,
-        status,
-        appUser.id,
-        resolutionNotes[complaint.id]
-      );
-      const refreshed = await getComplaintsByCondominium(params.id as string);
-      setComplaints(refreshed);
-    } catch {
-      alert("Error al actualizar el estado");
-    } finally {
-      setSavingId(null);
-    }
+
+    updateStatus({
+      id: complaint.id,
+      status,
+      resolverId: appUser.id,
+      resolutionNotes: resolutionNotes[complaint.id],
+    });
   };
 
-  const handleDelete = async (complaint: Complaint) => {
+  const handleDelete = (complaint: Complaint) => {
     if (
       !window.confirm(
         `¿Eliminar "${complaint.title}"? Esta acción no se puede deshacer.`
       )
     )
       return;
-    try {
-      await deleteComplaint(complaint.id, params.id as string);
-      setComplaints((prev) => prev.filter((c) => c.id !== complaint.id));
-    } catch {
-      alert("Error al eliminar");
-    }
+
+    deleteComplaint({ id: complaint.id, condominiumId });
   };
 
-  if (loading) {
+  const loading =
+    condominiumLoading ||
+    roleLoading ||
+    complaintsLoading ||
+    buildingsLoading ||
+    usersQueries.some((q) => q.isLoading) ||
+    authorUnitsQueries.some((q) => q.isLoading);
+
+  if (loading || !condominium) {
     return <PageSkeleton titleWidth="w-32" cardCount={3} cardLines={4} />;
   }
-
-  if (!condominium) return null;
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
@@ -262,7 +264,8 @@ export default function ComplaintsPage() {
                   {canManage && (
                     <button
                       onClick={() => handleDelete(complaint)}
-                      className="text-xs font-medium text-red-500 hover:text-red-700"
+                      disabled={isDeleting}
+                      className="text-xs font-medium text-red-500 hover:text-red-700 disabled:opacity-50"
                     >
                       Eliminar
                     </button>
@@ -327,7 +330,7 @@ export default function ComplaintsPage() {
                               e.target.value as ComplaintStatus
                             )
                           }
-                          disabled={savingId === complaint.id}
+                          disabled={isUpdatingStatus}
                           className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
                         >
                           <option value="pending">Pendiente</option>
@@ -357,7 +360,8 @@ export default function ComplaintsPage() {
                   </div>
                 )}
 
-                {!canManage && complaint.status === "resolved" &&
+                {!canManage &&
+                  complaint.status === "resolved" &&
                   complaint.resolution_notes && (
                     <div className="mt-4 rounded-lg border border-zinc-100 bg-zinc-50 p-3 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-400">
                       <span className="font-medium">Resolución:</span>{" "}
