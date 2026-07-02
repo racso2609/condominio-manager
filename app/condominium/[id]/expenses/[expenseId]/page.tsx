@@ -1,18 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
-import { getCondominium } from "@/lib/services/condominiumService";
-import { getExpense } from "@/lib/services/expenseService";
-import { getBuilding } from "@/lib/services/buildingService";
-import { getUnit } from "@/lib/services/unitService";
-import {
-  getEntriesByExpense,
-  markEntryAsPaid,
-} from "@/lib/services/expenseEntryService";
-import { Condominium, Expense, ExpenseEntry, Building, Unit } from "@/lib/types";
+import { useCondominium } from "@/lib/queries/useCondominium";
+import { useExpense } from "@/lib/queries/useExpense";
+import { useEntriesByExpense } from "@/lib/queries/useExpenseEntry";
+import { useUnits } from "@/lib/queries/useUnit";
+import { useBuildings } from "@/lib/queries/useBuilding";
+import { useMarkEntryAsPaid } from "@/lib/mutations/useExpenseEntryMutations";
 import PaymentOrderItem from "@/components/PaymentOrderItem";
 import { PageSkeleton } from "@/components/skeleton";
 
@@ -20,81 +17,73 @@ export default function ExpenseDetailPage() {
   const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
-  const [condominium, setCondominium] = useState<Condominium | null>(null);
-  const [expense, setExpense] = useState<Expense | null>(null);
-  const [entries, setEntries] = useState<ExpenseEntry[]>([]);
-  const [units, setUnits] = useState<Record<string, Unit>>({});
-  const [buildings, setBuildings] = useState<Record<string, Building>>({});
-  const [loading, setLoading] = useState(true);
-  const [validatingId, setValidatingId] = useState<string | null>(null);
+  const condominiumId = params.id as string;
+  const expenseId = params.expenseId as string;
+
+  const { data: condominium, isLoading: condominiumLoading } =
+    useCondominium(condominiumId);
+  const { data: expense, isLoading: expenseLoading } = useExpense(expenseId);
+  const { data: entries = [], isLoading: entriesLoading } =
+    useEntriesByExpense(expenseId);
+
+  const unitIds = useMemo(
+    () => Array.from(new Set(entries.map((e) => e.unit))),
+    [entries]
+  );
+  const unitsQueries = useUnits(unitIds);
+
+  const buildingIds = useMemo(() => {
+    const ids = new Set<string>();
+    unitsQueries.forEach((q) => {
+      if (q.data) ids.add(q.data.building);
+    });
+    return Array.from(ids);
+  }, [unitsQueries]);
+
+  const buildingsQueries = useBuildings(buildingIds);
+
+  const units = useMemo(() => {
+    const map: Record<string, import("@/lib/types").Unit> = {};
+    unitsQueries.forEach((q) => {
+      if (q.data) map[q.data.id] = q.data;
+    });
+    return map;
+  }, [unitsQueries]);
+
+  const buildings = useMemo(() => {
+    const map: Record<string, import("@/lib/types").Building> = {};
+    buildingsQueries.forEach((q) => {
+      if (q.data) map[q.data.id] = q.data;
+    });
+    return map;
+  }, [buildingsQueries]);
+
+  const { mutate: markAsPaid, isPending: isValidating } = useMarkEntryAsPaid();
 
   const isAdminOrManager =
     appUser?.role === "admin" || appUser?.role === "administrator";
 
   useEffect(() => {
-    if (!params.id || !params.expenseId) return;
-    const condoId = params.id as string;
-    const expenseId = params.expenseId as string;
-
-    Promise.all([getCondominium(condoId), getExpense(expenseId)]).then(
-      async ([c, exp]) => {
-        if (!c || !exp) {
-          router.replace("/home");
-          return;
-        }
-        setCondominium(c);
-        setExpense(exp);
-
-        const expenseEntries = await getEntriesByExpense(expenseId);
-        setEntries(expenseEntries);
-
-        const unitMap: Record<string, Unit> = {};
-        const buildingMap: Record<string, Building> = {};
-        for (const entry of expenseEntries) {
-          if (!unitMap[entry.unit]) {
-            const unit = await getUnit(entry.unit);
-            if (unit) {
-              unitMap[entry.unit] = unit;
-              if (!buildingMap[unit.building]) {
-                const building = await getBuilding(unit.building);
-                if (building) buildingMap[unit.building] = building;
-              }
-            }
-          }
-        }
-        setUnits(unitMap);
-        setBuildings(buildingMap);
-        setLoading(false);
-      }
-    );
-  }, [params.id, params.expenseId, router]);
-
-  const handleValidate = async (entryId: string, note: string) => {
-    if (!appUser) return;
-    setValidatingId(entryId);
-    try {
-      await markEntryAsPaid(entryId, {
-        notes: note,
-        validated_by: appUser.id,
-      });
-      setEntries((prev) =>
-        prev.map((e) =>
-          e.id === entryId
-            ? {
-                ...e,
-                status: "paid",
-                notes: note.trim() || e.notes,
-                validated_by: appUser.id,
-              }
-            : e
-        )
-      );
-    } catch {
-      alert("Error al validar el pago");
-    } finally {
-      setValidatingId(null);
+    if (!condominiumLoading && !expenseLoading && (condominium === null || expense === null)) {
+      router.replace("/home");
     }
+  }, [condominiumLoading, expenseLoading, condominium, expense, router]);
+
+  const handleValidate = (entryId: string, note: string) => {
+    if (!appUser) return;
+
+    markAsPaid({
+      id: entryId,
+      data: { notes: note, validated_by: appUser.id },
+    });
   };
+
+  const loading =
+    condominiumLoading ||
+    expenseLoading ||
+    entriesLoading ||
+    unitsQueries.some((q) => q.isLoading) ||
+    buildingsQueries.some((q) => q.isLoading);
 
   if (loading) {
     return (
@@ -125,7 +114,10 @@ export default function ExpenseDetailPage() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
       <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-        <Link href="/home" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+        <Link
+          href="/home"
+          className="hover:text-zinc-700 dark:hover:text-zinc-200"
+        >
           Mis condominios
         </Link>
         <span>/</span>
@@ -184,7 +176,7 @@ export default function ExpenseDetailPage() {
                 building={unit ? buildings[unit.building] : undefined}
                 showValidateForm
                 onValidate={(note) => handleValidate(entry.id, note)}
-                isValidating={validatingId === entry.id}
+                isValidating={isValidating}
               />
             );
           })

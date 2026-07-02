@@ -29,6 +29,16 @@ export function useEntriesByExpense(expenseId?: string) {
   });
 }
 
+export function useEntriesByExpenses(expenseIds: string[]) {
+  return useQueries({
+    queries: expenseIds.map((id) => ({
+      queryKey: queryKeys.expenseEntries.byExpense(id),
+      queryFn: () => getEntriesByExpense(id),
+      enabled: Boolean(id),
+    })) satisfies UseQueryOptions<ExpenseEntry[], Error, ExpenseEntry[], ReturnType<typeof queryKeys.expenseEntries.byExpense>>[],
+  });
+}
+
 export function useEntriesByUnit(unitId?: string) {
   return useQuery({
     queryKey: queryKeys.expenseEntries.byUnit(unitId ?? ""),

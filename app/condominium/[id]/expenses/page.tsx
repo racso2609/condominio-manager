@@ -1,65 +1,67 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
-import { getCondominium } from "@/lib/services/condominiumService";
-import { getBuildingsByCondominium } from "@/lib/services/buildingService";
-import { getExpensesByCondominium } from "@/lib/services/expenseService";
-import { getEntriesByExpense } from "@/lib/services/expenseEntryService";
-import { Condominium, Building, Expense } from "@/lib/types";
+import { useCondominium } from "@/lib/queries/useCondominium";
+import { useBuildingsByCondominium } from "@/lib/queries/useBuilding";
+import { useExpensesByCondominium } from "@/lib/queries/useExpense";
+import { useEntriesByExpenses } from "@/lib/queries/useExpenseEntry";
 import { PageSkeleton } from "@/components/skeleton";
 
 export default function ExpensesPage() {
   const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
-  const [condominium, setCondominium] = useState<Condominium | null>(null);
-  const [buildings, setBuildings] = useState<Building[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [entryCounts, setEntryCounts] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
+  const condominiumId = params.id as string;
+
+  const { data: condominium, isLoading: condominiumLoading } =
+    useCondominium(condominiumId);
+  const { data: buildings = [], isLoading: buildingsLoading } =
+    useBuildingsByCondominium(condominiumId);
+  const { data: expenses = [], isLoading: expensesLoading } =
+    useExpensesByCondominium(condominiumId);
+
+  const expenseIds = useMemo(() => expenses.map((e) => e.id), [expenses]);
+  const entriesQueries = useEntriesByExpenses(expenseIds);
+
+  const entryCounts = useMemo(() => {
+    const counts: Record<string, string> = {};
+    entriesQueries.forEach((q, index) => {
+      const expenseId = expenseIds[index];
+      if (!expenseId || !q.data) return;
+      const paid = q.data.filter((e) => e.status === "paid").length;
+      counts[expenseId] = `${paid}/${q.data.length}`;
+    });
+    return counts;
+  }, [entriesQueries, expenseIds]);
+
   const isAdminOrManager =
     appUser?.role === "admin" || appUser?.role === "administrator";
 
   useEffect(() => {
-    if (!params.id) return;
-    const id = params.id as string;
-    Promise.all([
-      getCondominium(id),
-      getBuildingsByCondominium(id),
-      getExpensesByCondominium(id),
-    ]).then(async ([c, blds, exps]) => {
-      if (!c) {
-        router.replace("/home");
-        return;
-      }
-      setCondominium(c);
-      setBuildings(blds);
-      setExpenses(exps);
-      const counts: Record<string, string> = {};
-      for (const exp of exps) {
-        const entries = await getEntriesByExpense(exp.id);
-        const paid = entries.filter((e) => e.status === "paid").length;
-        counts[exp.id] = `${paid}/${entries.length}`;
-      }
-      setEntryCounts(counts);
-      setLoading(false);
-    });
-  }, [params.id, router]);
+    if (!condominiumLoading && condominium === null) {
+      router.replace("/home");
+    }
+  }, [condominiumLoading, condominium, router]);
 
-  if (loading) {
+  const loading =
+    condominiumLoading || buildingsLoading || expensesLoading ||
+    entriesQueries.some((q) => q.isLoading);
+
+  if (loading || !condominium) {
     return <PageSkeleton titleWidth="w-32" cardCount={4} cardLines={2} />;
   }
-
-  if (!condominium) return null;
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
       <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-        <Link href="/home" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+        <Link
+          href="/home"
+          className="hover:text-zinc-700 dark:hover:text-zinc-200"
+        >
           Mis condominios
         </Link>
         <span>/</span>

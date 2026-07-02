@@ -1,29 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
-import { getCondominium } from "@/lib/services/condominiumService";
-import { getUnitsByOwner } from "@/lib/services/unitService";
+import { useCondominium } from "@/lib/queries/useCondominium";
+import { useUnitsByOwner } from "@/lib/queries/useUnit";
+import { useBuildings } from "@/lib/queries/useBuilding";
+import { useEntriesByUnits } from "@/lib/queries/useExpenseEntry";
 import {
-  getExpensesByCondominium,
-  getExpensesByBuilding,
-} from "@/lib/services/expenseService";
+  useExpensesByCondominium,
+  useExpensesByBuildings,
+} from "@/lib/queries/useExpense";
+import { usePaymentMethodsByCondominium } from "@/lib/queries/usePaymentMethod";
+import { useReportPayment } from "@/lib/mutations/useExpenseEntryMutations";
 import {
-  getEntriesByUnits,
-  reportPayment,
-} from "@/lib/services/expenseEntryService";
-import { getBuilding } from "@/lib/services/buildingService";
-import { getPaymentMethodsByCondominium } from "@/lib/services/paymentMethodService";
-import {
-  Condominium,
-  Building,
-  Unit,
-  Expense,
-  ExpenseEntry,
-  PaymentMethod,
   PaymentMethodType,
 } from "@/lib/types";
 import PaymentOrderItem from "@/components/PaymentOrderItem";
@@ -53,81 +45,69 @@ export default function ResidentPagosPage() {
   const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
-  const [condominium, setCondominium] = useState<Condominium | null>(null);
-  const [units, setUnits] = useState<Unit[]>([]);
-  const [entries, setEntries] = useState<ExpenseEntry[]>([]);
-  const [expenses, setExpenses] = useState<Record<string, Expense>>({});
-  const [buildings, setBuildings] = useState<Record<string, Building>>({});
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [dolarRate, setDolarRate] = useState<number | null>(null);
+  const condominiumId = params.id as string;
 
+  const { data: condominium, isLoading: condominiumLoading } =
+    useCondominium(condominiumId);
+  const { data: userUnits = [], isLoading: unitsLoading } = useUnitsByOwner(
+    appUser?.id
+  );
+  const { data: paymentMethods = [], isLoading: methodsLoading } =
+    usePaymentMethodsByCondominium(condominiumId);
+
+  const buildingIds = useMemo(
+    () => Array.from(new Set(userUnits.map((u) => u.building))),
+    [userUnits]
+  );
+  const buildingsQueries = useBuildings(buildingIds);
+
+  const buildings = useMemo(() => {
+    const map: Record<string, import("@/lib/types").Building> = {};
+    buildingsQueries.forEach((q) => {
+      if (q.data) map[q.data.id] = q.data;
+    });
+    return map;
+  }, [buildingsQueries]);
+
+  const units = useMemo(() => {
+    return userUnits.filter((u) => {
+      const b = buildings[u.building];
+      return b && b.condominium === condominiumId;
+    });
+  }, [userUnits, buildings, condominiumId]);
+
+  const unitIds = useMemo(() => units.map((u) => u.id), [units]);
+  const unitMap = useMemo(() => {
+    const map: Record<string, import("@/lib/types").Unit> = {};
+    units.forEach((u) => {
+      map[u.id] = u;
+    });
+    return map;
+  }, [units]);
+
+  const { data: entries = [], isLoading: entriesLoading } =
+    useEntriesByUnits(unitIds);
+
+  const { data: condoExpenses = [], isLoading: condoExpensesLoading } =
+    useExpensesByCondominium(condominiumId);
+  const buildingExpensesQueries = useExpensesByBuildings(buildingIds);
+
+  const expenses = useMemo(() => {
+    const map: Record<string, import("@/lib/types").Expense> = {};
+    condoExpenses.forEach((e) => (map[e.id] = e));
+    buildingExpensesQueries.forEach((q) => {
+      if (q.data) q.data.forEach((e) => (map[e.id] = e));
+    });
+    return map;
+  }, [condoExpenses, buildingExpensesQueries]);
+
+  const [dolarRate, setDolarRate] = useState<number | null>(null);
   const [reportingEntryId, setReportingEntryId] = useState<string | null>(null);
   const [reportPaymentMethod, setReportPaymentMethod] = useState("");
   const [reportReference, setReportReference] = useState("");
   const [reportProof, setReportProof] = useState<File | null>(null);
-  const [reporting, setReporting] = useState(false);
 
-  useEffect(() => {
-    if (!appUser || !params.id) return;
-    const condoId = params.id as string;
-    Promise.all([
-      getCondominium(condoId),
-      getUnitsByOwner(appUser.id),
-      getPaymentMethodsByCondominium(condoId),
-    ]).then(async ([c, userUnits, methods]) => {
-      if (!c) {
-        router.replace("/home");
-        return;
-      }
-      setCondominium(c);
-      setPaymentMethods(methods);
-
-      const myUnits = userUnits.filter((u) => {
-        return true;
-      });
-
-      const allBuildingIds = new Set(myUnits.map((u) => u.building));
-      const buildingMap: Record<string, Building> = {};
-      for (const bid of allBuildingIds) {
-        const b = await getBuilding(bid);
-        if (b) buildingMap[bid] = b;
-      }
-      setBuildings(buildingMap);
-
-      const myCondoUnits = myUnits.filter((u) => {
-        const b = buildingMap[u.building];
-        return b && b.condominium === condoId;
-      });
-      setUnits(myCondoUnits);
-
-      if (myCondoUnits.length === 0) {
-        setLoading(false);
-        return;
-      }
-
-      const unitIds = myCondoUnits.map((u) => u.id);
-      const expenseEntries = await getEntriesByUnits(unitIds);
-      setEntries(expenseEntries);
-
-      const expenseIds = new Set(expenseEntries.map((e) => e.expense));
-      const expenseMap: Record<string, Expense> = {};
-      const condoExpenses = await getExpensesByCondominium(condoId);
-      for (const exp of condoExpenses) {
-        expenseMap[exp.id] = exp;
-      }
-      const buildingExpenses = await Promise.all(
-        Array.from(allBuildingIds).map((bid) => getExpensesByBuilding(bid))
-      );
-      for (const exps of buildingExpenses) {
-        for (const exp of exps) {
-          expenseMap[exp.id] = exp;
-        }
-      }
-      setExpenses(expenseMap);
-      setLoading(false);
-    });
-  }, [appUser, params.id, router]);
+  const { mutate: reportPayment, isPending: reporting } = useReportPayment();
 
   useEffect(() => {
     if (!condominium) return;
@@ -140,47 +120,40 @@ export default function ResidentPagosPage() {
       .catch(() => setDolarRate(null));
   }, [condominium]);
 
+  useEffect(() => {
+    if (!condominiumLoading && condominium === null) {
+      router.replace("/home");
+    }
+  }, [condominiumLoading, condominium, router]);
+
   const formatBs = (amount: number) =>
     amount.toLocaleString("es-VE", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
 
-  const handleReportPayment = async (entryId: string) => {
+  const handleReportPayment = (entryId: string) => {
     if (!appUser) return;
-    setReporting(true);
-    try {
-      await reportPayment(entryId, {
-        payment_method_id: reportPaymentMethod || undefined,
-        payment_reference: reportReference,
-        payment_proof: reportProof ?? undefined,
-        reported_by: appUser.id,
-      });
 
-      setEntries((prev) =>
-        prev.map((e) =>
-          e.id === entryId
-            ? {
-                ...e,
-                status: "pending_validation",
-                payment_method_id: reportPaymentMethod || null,
-                payment_reference: reportReference.trim() || null,
-                payment_proof_url: e.payment_proof_url,
-                reported_by: appUser.id,
-              }
-            : e
-        )
-      );
-
-      setReportingEntryId(null);
-      setReportPaymentMethod("");
-      setReportReference("");
-      setReportProof(null);
-    } catch {
-      alert("Error al reportar el pago");
-    } finally {
-      setReporting(false);
-    }
+    reportPayment(
+      {
+        entryId,
+        data: {
+          payment_method_id: reportPaymentMethod || undefined,
+          payment_reference: reportReference,
+          payment_proof: reportProof ?? undefined,
+          reported_by: appUser.id,
+        },
+      },
+      {
+        onSuccess: () => {
+          setReportingEntryId(null);
+          setReportPaymentMethod("");
+          setReportReference("");
+          setReportProof(null);
+        },
+      }
+    );
   };
 
   const pendingEntries = entries.filter(
@@ -189,6 +162,15 @@ export default function ResidentPagosPage() {
   const paidEntries = entries.filter((e) => e.status === "paid");
   const totalPending = pendingEntries.reduce((s, e) => s + e.amount, 0);
   const totalPaid = paidEntries.reduce((s, e) => s + e.amount, 0);
+
+  const loading =
+    condominiumLoading ||
+    unitsLoading ||
+    methodsLoading ||
+    entriesLoading ||
+    condoExpensesLoading ||
+    buildingsQueries.some((q) => q.isLoading) ||
+    buildingExpensesQueries.some((q) => q.isLoading);
 
   if (loading) {
     return <PaymentsSkeleton />;
@@ -199,7 +181,10 @@ export default function ResidentPagosPage() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
       <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-        <Link href="/home" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+        <Link
+          href="/home"
+          className="hover:text-zinc-700 dark:hover:text-zinc-200"
+        >
           Mis condominios
         </Link>
         <span>/</span>
@@ -270,7 +255,7 @@ export default function ResidentPagosPage() {
             ) : (
               entries.map((entry) => {
                 const expense = expenses[entry.expense];
-                const unit = units.find((u) => u.id === entry.unit);
+                const unit = unitMap[entry.unit];
                 const isReporting = reportingEntryId === entry.id;
 
                 return (

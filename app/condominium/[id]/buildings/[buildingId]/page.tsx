@@ -1,64 +1,72 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
-import { getBuilding, deleteBuilding } from "@/lib/services/buildingService";
+import { useBuilding } from "@/lib/queries/useBuilding";
+import { useUnitsByBuilding } from "@/lib/queries/useUnit";
+import { useUsers } from "@/lib/queries/useUser";
+import { useDeleteBuilding } from "@/lib/mutations/useBuildingMutations";
 import {
-  getUnitsByBuilding,
-  deleteUnit,
-  updateUnitType,
-  claimUnit,
-  verifyUnitOwner,
-  rejectUnitClaim,
-} from "@/lib/services/unitService";
-import { getUser } from "@/lib/services/userService";
-import { Building, Unit, AppUser } from "@/lib/types";
+  useDeleteUnit,
+  useUpdateUnitType,
+  useClaimUnit,
+  useVerifyUnitOwner,
+  useRejectUnitClaim,
+} from "@/lib/mutations/useUnitMutations";
+import { Unit } from "@/lib/types";
 import { BuildingDetailSkeleton } from "@/components/skeleton";
 
 export default function BuildingDetail() {
   const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
-  const [building, setBuilding] = useState<Building | null>(null);
-  const [units, setUnits] = useState<Unit[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [deleting, setDeleting] = useState(false);
+  const buildingId = params.buildingId as string;
+  const condominiumId = params.id as string;
+
+  const { data: building, isLoading: buildingLoading } = useBuilding(buildingId);
+  const { data: units = [], isLoading: unitsLoading } =
+    useUnitsByBuilding(buildingId);
+
+  const ownerIds = useMemo(
+    () => Array.from(new Set(units.filter((u) => u.owner).map((u) => u.owner))),
+    [units]
+  );
+  const ownersQueries = useUsers(ownerIds);
+
+  const owners = useMemo(() => {
+    const map: Record<string, import("@/lib/types").AppUser> = {};
+    ownersQueries.forEach((q) => {
+      if (q.data) map[q.data.id] = q.data;
+    });
+    return map;
+  }, [ownersQueries]);
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectMode, setSelectMode] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [owners, setOwners] = useState<Record<string, AppUser>>({});
-  const [claiming, setClaiming] = useState<string | null>(null);
-  const [verifying, setVerifying] = useState<string | null>(null);
-  const [rejecting, setRejecting] = useState<string | null>(null);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
+
+  const { mutate: deleteBuilding, isPending: deletingBuilding } =
+    useDeleteBuilding();
+  const { mutateAsync: deleteUnitAsync } = useDeleteUnit();
+  const { mutateAsync: updateUnitTypeAsync } = useUpdateUnitType();
+  const { mutate: claimUnit, isPending: claiming } = useClaimUnit();
+  const { mutate: verifyUnitOwner, isPending: verifying } =
+    useVerifyUnitOwner();
+  const { mutate: rejectUnitClaim, isPending: rejecting } =
+    useRejectUnitClaim();
+
   const isAdminOrManager =
     appUser?.role === "admin" || appUser?.role === "administrator";
 
   useEffect(() => {
-    if (!params.buildingId) return;
-    const id = params.buildingId as string;
-    Promise.all([getBuilding(id), getUnitsByBuilding(id)]).then(
-      async ([b, u]) => {
-        if (!b) router.replace(`/condominium/${params.id}`);
-        else {
-          setBuilding(b);
-          setUnits(u);
-          const ownerIds = new Set(
-            u.filter((unit) => unit.owner).map((unit) => unit.owner),
-          );
-          const ownerMap: Record<string, AppUser> = {};
-          for (const oid of ownerIds) {
-            const user = await getUser(oid);
-            if (user) ownerMap[oid] = user;
-          }
-          setOwners(ownerMap);
-        }
-        setLoading(false);
-      },
-    );
-  }, [params.buildingId, params.id, router]);
+    if (!buildingLoading && building === null) {
+      router.replace(`/condominium/${condominiumId}`);
+    }
+  }, [buildingLoading, building, router, condominiumId]);
 
   const toggleUnit = (id: string) => {
     setSelected((prev) => {
@@ -90,96 +98,62 @@ export default function BuildingDetail() {
     if (!window.confirm(`¿Eliminar ${selected.size} unidades seleccionadas?`))
       return;
     setProcessing(true);
-    await Promise.all([...selected].map((id) => deleteUnit(id)));
-    setUnits((prev) => prev.filter((u) => !selected.has(u.id)));
+    await Promise.all([...selected].map((id) => deleteUnitAsync(id)));
     setSelected(new Set());
     setProcessing(false);
   };
 
   const bulkSetType = async (type: "residential" | "office") => {
     setProcessing(true);
-    await Promise.all([...selected].map((id) => updateUnitType(id, type)));
-    setUnits((prev) =>
-      prev.map((u) => (selected.has(u.id) ? { ...u, type } : u)),
+    await Promise.all(
+      [...selected].map((id) => updateUnitTypeAsync({ id, type }))
     );
     setSelected(new Set());
     setProcessing(false);
   };
 
-  const handleDeleteBuilding = async () => {
+  const handleDeleteBuilding = () => {
     if (
       !window.confirm(
-        "¿Eliminar este edificio? Esta acción no se puede deshacer.",
+        "¿Eliminar este edificio? Esta acción no se puede deshacer."
       )
     )
       return;
-    setDeleting(true);
-    try {
-      await deleteBuilding(params.buildingId as string);
-      router.push(`/condominium/${params.id}`);
-    } catch {
-      setDeleting(false);
-    }
+
+    deleteBuilding(buildingId, {
+      onSuccess: () => router.push(`/condominium/${condominiumId}`),
+    });
   };
 
-  const handleClaim = async (unitId: string) => {
+  const handleClaim = (unitId: string) => {
     if (!appUser) return;
-    setClaiming(unitId);
-    try {
-      await claimUnit(unitId, appUser.id);
-      setUnits((prev) =>
-        prev.map((u) =>
-          u.id === unitId
-            ? { ...u, owner: appUser.id, owner_status: "pending" as const }
-            : u,
-        ),
-      );
-      const owner = await getUser(appUser.id);
-      if (owner) setOwners((prev) => ({ ...prev, [appUser.id]: owner }));
-    } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Error al reclamar unidad");
-    } finally {
-      setClaiming(null);
-    }
+    setClaimingId(unitId);
+    claimUnit(
+      { unitId, userId: appUser.id },
+      {
+        onError: (e) => alert(e instanceof Error ? e.message : "Error al reclamar unidad"),
+        onSettled: () => setClaimingId(null),
+      }
+    );
   };
 
-  const handleVerifyUnit = async (unitId: string) => {
-    setVerifying(unitId);
-    try {
-      await verifyUnitOwner(unitId);
-      setUnits((prev) =>
-        prev.map((u) =>
-          u.id === unitId ? { ...u, owner_status: "verified" as const } : u,
-        ),
-      );
-    } catch {
-      alert("Error al validar");
-    } finally {
-      setVerifying(null);
-    }
+  const handleVerifyUnit = (unitId: string) => {
+    verifyUnitOwner(unitId);
   };
 
-  const handleReject = async (unitId: string) => {
+  const handleReject = (unitId: string) => {
     if (
       !window.confirm(
-        "¿Rechazar esta solicitud? El usuario no podrá reclamar esta unidad por 1 semana.",
+        "¿Rechazar esta solicitud? El usuario no podrá reclamar esta unidad por 1 semana."
       )
     )
       return;
-    setRejecting(unitId);
-    try {
-      await rejectUnitClaim(unitId);
-      setUnits((prev) =>
-        prev.map((u) =>
-          u.id === unitId ? { ...u, owner: "", owner_status: undefined } : u,
-        ),
-      );
-    } catch {
-      alert("Error al rechazar");
-    } finally {
-      setRejecting(null);
-    }
+
+    rejectUnitClaim(unitId);
   };
+
+  const loading =
+    buildingLoading || unitsLoading || ownersQueries.some((q) => q.isLoading);
 
   if (loading) {
     return <BuildingDetailSkeleton />;
@@ -198,7 +172,7 @@ export default function BuildingDetail() {
         </Link>
         <span>/</span>
         <Link
-          href={`/condominium/${params.id}`}
+          href={`/condominium/${condominiumId}`}
           className="hover:text-zinc-700 dark:hover:text-zinc-200"
         >
           Condominio
@@ -227,14 +201,14 @@ export default function BuildingDetail() {
         {isAdminOrManager && (
           <div className="flex gap-2">
             <Button
-              href={`/condominium/${params.id}/buildings/${building.id}/edit`}
+              href={`/condominium/${condominiumId}/buildings/${building.id}/edit`}
               variant="secondary"
               size="lg"
             >
               Editar
             </Button>
             <Button
-              href={`/condominium/${params.id}/buildings/${building.id}/duplicate`}
+              href={`/condominium/${condominiumId}/buildings/${building.id}/duplicate`}
               variant="secondary"
               size="lg"
             >
@@ -242,10 +216,10 @@ export default function BuildingDetail() {
             </Button>
             <button
               onClick={handleDeleteBuilding}
-              disabled={deleting}
+              disabled={deletingBuilding}
               className="flex h-10 items-center rounded-full border border-red-200 px-5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-900/20"
             >
-              {deleting ? "Eliminando..." : "Eliminar"}
+              {deletingBuilding ? "Eliminando..." : "Eliminar"}
             </button>
           </div>
         )}
@@ -268,7 +242,7 @@ export default function BuildingDetail() {
               {selectMode ? "Cancelar selección" : "Seleccionar"}
             </button>
             <Button
-              href={`/condominium/${params.id}/buildings/${building.id}/units/new`}
+              href={`/condominium/${condominiumId}/buildings/${building.id}/units/new`}
               variant="primary"
               size="md"
             >
@@ -343,7 +317,7 @@ export default function BuildingDetail() {
           )}
           {(() => {
             const floors = [...new Set(units.map((u) => u.floor))].sort(
-              (a, b) => b - a,
+              (a, b) => b - a
             );
             return floors.map((floor) => {
               const floorUnits = units
@@ -413,10 +387,10 @@ export default function BuildingDetail() {
                           ) && (
                             <button
                               onClick={() => handleClaim(u.id)}
-                              disabled={claiming === u.id}
+                              disabled={claiming && claimingId === u.id}
                               className="ml-auto h-7 rounded-full border border-zinc-300 px-3 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
                             >
-                              {claiming === u.id ? "..." : "Reclamar"}
+                              {claiming && claimingId === u.id ? "..." : "Reclamar"}
                             </button>
                           )}
                         {isAdminOrManager &&
@@ -425,21 +399,20 @@ export default function BuildingDetail() {
                             <>
                               <button
                                 onClick={() => handleVerifyUnit(u.id)}
-                                disabled={verifying === u.id}
+                                disabled={verifying}
                                 className="h-7 rounded-full bg-emerald-600 px-3 text-xs font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-40"
                               >
-                                {verifying === u.id ? "..." : "Validar"}
+                                {verifying ? "..." : "Validar"}
                               </button>
                               <button
                                 onClick={() => handleReject(u.id)}
-                                disabled={rejecting === u.id}
+                                disabled={rejecting}
                                 className="h-7 rounded-full border border-red-300 px-3 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
                               >
-                                {rejecting === u.id ? "..." : "Rechazar"}
+                                {rejecting ? "..." : "Rechazar"}
                               </button>
                             </>
                           )}
-
                       </div>
                     ))}
                   </div>
