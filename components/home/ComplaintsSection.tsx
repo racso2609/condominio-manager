@@ -36,20 +36,20 @@ export function ComplaintsSection({
           id="complaints-heading"
           className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50"
         >
-          Mis quejas
+          Quejas
         </h2>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Consulta el estado de tus reportes y seguimientos
+          Mantente informado sobre los reportes de tus condominios
         </p>
       </div>
 
       {complaints.length === 0 ? (
         <div className="rounded-xl border border-zinc-200 bg-white px-6 py-10 text-center dark:border-zinc-800 dark:bg-black">
           <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-            No tienes quejas registradas
+            No hay quejas registradas
           </p>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Desde el detalle de tu condominio puedes crear una nueva queja
+            Los residentes podrán publicar reportes desde el detalle del condominio
           </p>
         </div>
       ) : (

@@ -103,14 +103,10 @@ export function useHomeData(appUser: AppUser | undefined): UseHomeDataResult {
       ]);
       setAnnouncements(allAnnouncements);
 
-      const visibleComplaints =
-        appUser.role === "admin"
-          ? allComplaints
-          : allComplaints.filter((c) => c.author === appUser.id);
-      visibleComplaints.sort(
+      allComplaints.sort(
         (a, b) => b.created_at.toMillis() - a.created_at.toMillis()
       );
-      setComplaints(visibleComplaints);
+      setComplaints(allComplaints);
 
       const authorIds = new Set<string>();
       const announcementCondoIds = new Set<string>();
@@ -118,7 +114,7 @@ export function useHomeData(appUser: AppUser | undefined): UseHomeDataResult {
         authorIds.add(a.author);
         announcementCondoIds.add(a.condominium);
       });
-      visibleComplaints.forEach((c) => {
+      allComplaints.forEach((c) => {
         authorIds.add(c.author);
       });
 

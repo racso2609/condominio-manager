@@ -10,7 +10,6 @@ import {
   getUserCondominiumRole,
 } from "@/lib/services/condominiumService";
 import {
-  getComplaintsByAuthor,
   getComplaintsByCondominium,
   updateComplaintStatus,
   deleteComplaint,
@@ -81,9 +80,7 @@ export default function ComplaintsPage() {
       setCondominium(condo);
       setUserRole(role);
 
-      const data = canManage
-        ? await getComplaintsByCondominium(id)
-        : await getComplaintsByAuthor(id, appUser.id);
+      const data = await getComplaintsByCondominium(id);
 
       setComplaints(data);
 
@@ -116,9 +113,7 @@ export default function ComplaintsPage() {
         appUser.id,
         resolutionNotes[complaint.id]
       );
-      const refreshed = canManage
-        ? await getComplaintsByCondominium(params.id as string)
-        : await getComplaintsByAuthor(params.id as string, appUser.id);
+      const refreshed = await getComplaintsByCondominium(params.id as string);
       setComplaints(refreshed);
     } catch {
       alert("Error al actualizar el estado");
