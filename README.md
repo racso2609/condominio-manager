@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Condominio Gestión
 
-## Getting Started
+Aplicación web para la gestión de condominios. Permite administrar edificios, unidades, residentes, gastos comunes, pagos, anuncios y métodos de pago.
 
-First, run the development server:
+## Características
+
+- **Autenticación** con Firebase Authentication (Google).
+- **Gestión de condominios**: crear, editar, completar registro y administrar edificios.
+- **Gestión de edificios y unidades**: generación automática de unidades, selección múltiple, duplicación de edificios.
+- **Residentes**: invitaciones individuales y grupales, reclamo de unidades, validación de propiedad y asignación manual por administradores.
+- **Gastos comunes**: creación de gastos, generación de órdenes de pago por unidad.
+- **Pagos**: reporte de pagos por residentes, validación por administradores, métodos de pago.
+- **Anuncios**: publicación de anuncios con imágenes y documentos.
+- **Dashboard de residentes**: visualización de deudas pendientes y pagos realizados.
+
+## Tecnologías
+
+- [Next.js](https://nextjs.org) 16
+- [React](https://react.dev) 19
+- [TypeScript](https://www.typescriptlang.org)
+- [Tailwind CSS](https://tailwindcss.com) 4
+- [Firebase](https://firebase.google.com) (Authentication, Firestore, Storage)
+
+## Requisitos previos
+
+- Node.js 20 o superior
+- Cuenta de Firebase con un proyecto configurado
+
+## Configuración
+
+1. Clona el repositorio e instala las dependencias:
+
+```bash
+npm install
+```
+
+2. Crea un archivo `.env.local` en la raíz del proyecto con la configuración de Firebase:
+
+```env
+NEXT_PUBLIC_FIREBASE_API_KEY=tu_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=tu_auth_domain
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=tu_project_id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=tu_storage_bucket
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=tu_messaging_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=tu_app_id
+```
+
+3. Configura Firebase Authentication con el proveedor de Google.
+
+4. (Opcional) Configura Firestore Security Rules y Storage Rules según las necesidades del proyecto.
+
+## Ejecutar en desarrollo
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abre [http://localhost:3000](http://localhost:3000) en tu navegador.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Construir para producción
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+```
 
-## Learn More
+## Despliegue
 
-To learn more about Next.js, take a look at the following resources:
+La aplicación puede desplegarse en cualquier plataforma que soporte Next.js, como [Vercel](https://vercel.com) o [Firebase App Hosting](https://firebase.google.com/docs/app-hosting).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Estructura del proyecto
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+app/                    # Rutas y páginas de Next.js
+components/             # Componentes reutilizables
+lib/
+  services/             # Funciones de acceso a Firebase
+  types.ts              # Tipos de TypeScript
+firebase.ts             # Configuración de Firebase
+public/                 # Archivos estáticos
+```
 
-## Deploy on Vercel
+## Scripts disponibles
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `npm run dev` — Inicia el servidor de desarrollo.
+- `npm run build` — Construye la aplicación para producción.
+- `npm run start` — Inicia la aplicación en modo producción.
+- `npm run lint` — Ejecuta ESLint.
