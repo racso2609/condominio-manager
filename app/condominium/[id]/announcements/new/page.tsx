@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
-import { createAnnouncement } from "@/lib/services/announcementService";
+import { useCreateAnnouncement } from "@/lib/mutations/useAnnouncementMutations";
 
 const ALLOWED_TYPES = [
   "image/jpeg", "image/png", "image/webp", "image/gif",
@@ -22,7 +22,9 @@ export default function NewAnnouncementPage() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [files, setFiles] = useState<File[]>([]);
-  const [saving, setSaving] = useState(false);
+
+  const { mutate: createAnnouncement, isPending: saving } =
+    useCreateAnnouncement();
 
   const isAdminOrManager =
     appUser?.role === "admin" || appUser?.role === "administrator";
@@ -46,26 +48,27 @@ export default function NewAnnouncementPage() {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!appUser || !params.id) return;
-    setSaving(true);
-    try {
-      const announcement = await createAnnouncement({
+
+    createAnnouncement(
+      {
         condominium: params.id as string,
         title: title.trim(),
         content: content.trim(),
         author: appUser.id,
         files: files.length > 0 ? files : undefined,
-      });
-      router.push(
-        `/condominium/${params.id}/announcements?id=${announcement.id}`
-      );
-    } catch {
-      alert("Error al publicar anuncio");
-    } finally {
-      setSaving(false);
-    }
+      },
+      {
+        onSuccess: (announcement) => {
+          router.push(
+            `/condominium/${params.id}/announcements?id=${announcement.id}`
+          );
+        },
+        onError: () => alert("Error al publicar anuncio"),
+      }
+    );
   };
 
   if (!isAdminOrManager) {

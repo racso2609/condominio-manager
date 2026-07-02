@@ -1,24 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
-import { getCondominium } from "@/lib/services/condominiumService";
-import { getBuildingsByCondominium } from "@/lib/services/buildingService";
-import { getUnitsByBuilding } from "@/lib/services/unitService";
-import { createExpense } from "@/lib/services/expenseService";
-import { createExpenseEntries } from "@/lib/services/expenseEntryService";
-import { Condominium, Building, Unit } from "@/lib/types";
+import { useCondominium } from "@/lib/queries/useCondominium";
+import { useBuildingsByCondominium } from "@/lib/queries/useBuilding";
+import { useUnitsByBuildings } from "@/lib/queries/useUnit";
+import { useCreateExpense } from "@/lib/mutations/useExpenseMutations";
+import { useCreateExpenseEntries } from "@/lib/mutations/useExpenseEntryMutations";
 import { FormSkeleton } from "@/components/skeleton";
 
 export default function NewExpensePage() {
   const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
-  const [condominium, setCondominium] = useState<Condominium | null>(null);
-  const [buildings, setBuildings] = useState<Building[]>([]);
+  const condominiumId = params.id as string;
+
+  const { data: condominium, isLoading: condominiumLoading } =
+    useCondominium(condominiumId);
+  const { data: buildings = [], isLoading: buildingsLoading } =
+    useBuildingsByCondominium(condominiumId);
+
   const [scope, setScope] = useState<"condominium" | "building">("condominium");
   const [selectedBuilding, setSelectedBuilding] = useState("");
   const [title, setTitle] = useState("");
@@ -27,75 +31,71 @@ export default function NewExpensePage() {
   const [dueDate, setDueDate] = useState("");
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (buildings.length > 0 && !selectedBuilding) {
+      setSelectedBuilding(buildings[0].id);
+    }
+  }, [buildings, selectedBuilding]);
+
+  const buildingIds = useMemo(() => buildings.map((b) => b.id), [buildings]);
+  const unitsQueries = useUnitsByBuildings(buildingIds);
+
+  const allUnits = useMemo(() => {
+    return unitsQueries.flatMap((q) => q.data ?? []);
+  }, [unitsQueries]);
+
+  const scopeUnits = useMemo(() => {
+    if (scope === "condominium") return allUnits;
+    return allUnits.filter((u) => u.building === selectedBuilding);
+  }, [scope, allUnits, selectedBuilding]);
+
+  const { mutate: createExpense, isPending: creatingExpense } =
+    useCreateExpense();
+  const { mutateAsync: createExpenseEntriesAsync } = useCreateExpenseEntries();
 
   const isAdminOrManager =
     appUser?.role === "admin" || appUser?.role === "administrator";
 
   useEffect(() => {
-    if (!params.id) return;
-    const id = params.id as string;
-    Promise.all([getCondominium(id), getBuildingsByCondominium(id)]).then(
-      ([c, blds]) => {
-        if (!c) router.replace("/home");
-        else {
-          setCondominium(c);
-          setBuildings(blds);
-          if (blds.length > 0) setSelectedBuilding(blds[0].id);
-        }
-        setLoading(false);
-      }
-    );
-  }, [params.id, router]);
-
-  const getScopeUnits = async (): Promise<Unit[]> => {
-    if (scope === "condominium") {
-      const allUnits: Unit[] = [];
-      for (const b of buildings) {
-        const units = await getUnitsByBuilding(b.id);
-        allUnits.push(...units);
-      }
-      return allUnits;
+    if (!condominiumLoading && condominium === null) {
+      router.replace("/home");
     }
-    if (!selectedBuilding) return [];
-    return getUnitsByBuilding(selectedBuilding);
-  };
+  }, [condominiumLoading, condominium, router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!appUser || !params.id) return;
-    setSaving(true);
-    try {
-      const units = await getScopeUnits();
-      if (units.length === 0) {
-        alert("No hay unidades en el ámbito seleccionado.");
-        setSaving(false);
-        return;
-      }
+    if (!appUser) return;
 
-      const totalAmount = parseFloat(amount);
-      if (isNaN(totalAmount) || totalAmount <= 0) {
-        alert("Ingresa un monto válido.");
-        setSaving(false);
-        return;
-      }
+    if (scopeUnits.length === 0) {
+      alert("No hay unidades en el ámbito seleccionado.");
+      return;
+    }
 
-      const perUnit = totalAmount / units.length;
-      const unitAmounts = units.map((u) => ({
-        unit: u.id,
-        amount: Math.round(perUnit * 100) / 100,
-      }));
+    const totalAmount = parseFloat(amount);
+    if (isNaN(totalAmount) || totalAmount <= 0) {
+      alert("Ingresa un monto válido.");
+      return;
+    }
 
-      const remainder = Math.round(
+    const perUnit = totalAmount / scopeUnits.length;
+    const unitAmounts = scopeUnits.map((u) => ({
+      unit: u.id,
+      amount: Math.round(perUnit * 100) / 100,
+    }));
+
+    const remainder =
+      Math.round(
         (totalAmount - unitAmounts.reduce((s, ua) => s + ua.amount, 0)) * 100
       ) / 100;
-      if (Math.abs(remainder) > 0.001 && unitAmounts.length > 0) {
-        unitAmounts[0].amount = Math.round((unitAmounts[0].amount + remainder) * 100) / 100;
-      }
+    if (Math.abs(remainder) > 0.001 && unitAmounts.length > 0) {
+      unitAmounts[0].amount =
+        Math.round((unitAmounts[0].amount + remainder) * 100) / 100;
+    }
 
-      const expense = await createExpense({
-        condominium: scope === "condominium" ? (params.id as string) : undefined,
+    createExpense(
+      {
+        condominium: scope === "condominium" ? condominiumId : undefined,
         building: scope === "building" ? selectedBuilding : undefined,
         title: title.trim(),
         description: description.trim() || undefined,
@@ -103,17 +103,20 @@ export default function NewExpensePage() {
         due_date: new Date(dueDate),
         period_start: periodStart ? new Date(periodStart) : undefined,
         period_end: periodEnd ? new Date(periodEnd) : undefined,
-      });
-
-      await createExpenseEntries(expense.id, unitAmounts);
-
-      router.push(`/condominium/${params.id}/expenses`);
-    } catch {
-      alert("Error al crear el gasto");
-    } finally {
-      setSaving(false);
-    }
+      },
+      {
+        onSuccess: async (expense) => {
+          await createExpenseEntriesAsync({
+            expenseId: expense.id,
+            unitAmounts,
+          });
+          router.push(`/condominium/${condominiumId}/expenses`);
+        },
+      }
+    );
   };
+
+  const loading = condominiumLoading || buildingsLoading;
 
   if (loading) {
     return <FormSkeleton titleWidth="w-40" inputCount={6} />;
@@ -131,6 +134,8 @@ export default function NewExpensePage() {
 
   if (!condominium) return null;
 
+  const saving = creatingExpense;
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
       <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
@@ -142,14 +147,14 @@ export default function NewExpensePage() {
         </Link>
         <span>/</span>
         <Link
-          href={`/condominium/${params.id}`}
+          href={`/condominium/${condominiumId}`}
           className="hover:text-zinc-700 dark:hover:text-zinc-200"
         >
           {condominium.name}
         </Link>
         <span>/</span>
         <Link
-          href={`/condominium/${params.id}/expenses`}
+          href={`/condominium/${condominiumId}/expenses`}
           className="hover:text-zinc-700 dark:hover:text-zinc-200"
         >
           Gastos
@@ -306,7 +311,7 @@ export default function NewExpensePage() {
             {saving ? "Creando..." : "Crear gasto"}
           </Button>
           <Button
-            href={`/condominium/${params.id}/expenses`}
+            href={`/condominium/${condominiumId}/expenses`}
             variant="secondary"
             size="lg"
           >

@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
-import { createBuilding } from "@/lib/services/buildingService";
+import { useCreateBuilding } from "@/lib/mutations/useBuildingMutations";
 
 export default function NewBuilding() {
   const { appUser } = useAuthContext();
@@ -13,8 +13,9 @@ export default function NewBuilding() {
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [address, setAddress] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  const { mutate: createBuilding, isPending: submitting } = useCreateBuilding();
 
   const canCreate = appUser?.role === "admin" || appUser?.role === "administrator";
 
@@ -39,24 +40,24 @@ export default function NewBuilding() {
     );
   }
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !symbol.trim()) return;
-    setSubmitting(true);
     setError("");
 
-    try {
-      await createBuilding({
+    createBuilding(
+      {
         condominium: params.id as string,
         name: name.trim(),
         symbol: symbol.trim(),
         address: address.trim() || undefined,
-      });
-      router.push(`/condominium/${params.id}`);
-    } catch {
-      setError("Ocurrió un error al crear el edificio. Intenta de nuevo.");
-      setSubmitting(false);
-    }
+      },
+      {
+        onSuccess: () => router.push(`/condominium/${params.id}`),
+        onError: () =>
+          setError("Ocurrió un error al crear el edificio. Intenta de nuevo."),
+      }
+    );
   };
 
   return (

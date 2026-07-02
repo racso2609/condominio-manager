@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
-import { getCondominium } from "@/lib/services/condominiumService";
-import { createPaymentMethod } from "@/lib/services/paymentMethodService";
-import { Condominium, PaymentMethodType } from "@/lib/types";
+import { useCondominium } from "@/lib/queries/useCondominium";
+import { useCreatePaymentMethod } from "@/lib/mutations/usePaymentMethodMutations";
+import { PaymentMethodType } from "@/lib/types";
 import { FormSkeleton } from "@/components/skeleton";
 
 const TYPE_OPTIONS: { value: PaymentMethodType; label: string }[] = [
@@ -39,7 +39,11 @@ export default function NewPaymentMethodPage() {
   const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
-  const [condominium, setCondominium] = useState<Condominium | null>(null);
+  const condominiumId = params.id as string;
+
+  const { data: condominium, isLoading: condominiumLoading } =
+    useCondominium(condominiumId);
+
   const [type, setType] = useState<PaymentMethodType>("bank_transfer");
   const [name, setName] = useState("");
   const [holderName, setHolderName] = useState("");
@@ -51,8 +55,9 @@ export default function NewPaymentMethodPage() {
   const [identification, setIdentification] = useState("");
   const [notes, setNotes] = useState("");
   const [isDefault, setIsDefault] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
+
+  const { mutate: createPaymentMethod, isPending: saving } =
+    useCreatePaymentMethod();
 
   const isAdminOrManager =
     appUser?.role === "admin" || appUser?.role === "administrator";
@@ -61,18 +66,14 @@ export default function NewPaymentMethodPage() {
   const isVisible = (field: string) => visibleFields.includes(field);
 
   useEffect(() => {
-    if (!params.id) return;
-    const id = params.id as string;
-    getCondominium(id).then((c) => {
-      if (!c) router.replace("/home");
-      else setCondominium(c);
-      setLoading(false);
-    });
-  }, [params.id, router]);
+    if (!condominiumLoading && condominium === null) {
+      router.replace("/home");
+    }
+  }, [condominiumLoading, condominium, router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!appUser || !params.id || !condominium) return;
+    if (!appUser || !condominium) return;
 
     const trimmedName = name.trim();
     if (!trimmedName) {
@@ -80,9 +81,8 @@ export default function NewPaymentMethodPage() {
       return;
     }
 
-    setSaving(true);
-    try {
-      await createPaymentMethod({
+    createPaymentMethod(
+      {
         condominium: condominium.id,
         name: trimmedName,
         type,
@@ -105,17 +105,16 @@ export default function NewPaymentMethodPage() {
           : undefined,
         notes: notes.trim() || undefined,
         is_default: isDefault,
-      });
-
-      router.push(`/condominium/${params.id}/payment-methods`);
-    } catch {
-      alert("Error al crear el método de pago");
-    } finally {
-      setSaving(false);
-    }
+      },
+      {
+        onSuccess: () =>
+          router.push(`/condominium/${condominiumId}/payment-methods`),
+        onError: () => alert("Error al crear el método de pago"),
+      }
+    );
   };
 
-  if (loading) {
+  if (condominiumLoading) {
     return <FormSkeleton titleWidth="w-56" inputCount={7} />;
   }
 
@@ -142,14 +141,14 @@ export default function NewPaymentMethodPage() {
         </Link>
         <span>/</span>
         <Link
-          href={`/condominium/${params.id}`}
+          href={`/condominium/${condominiumId}`}
           className="hover:text-zinc-700 dark:hover:text-zinc-200"
         >
           {condominium.name}
         </Link>
         <span>/</span>
         <Link
-          href={`/condominium/${params.id}/payment-methods`}
+          href={`/condominium/${condominiumId}/payment-methods`}
           className="hover:text-zinc-700 dark:hover:text-zinc-200"
         >
           Métodos de pago
@@ -328,7 +327,7 @@ export default function NewPaymentMethodPage() {
             {saving ? "Creando..." : "Crear método"}
           </button>
           <Link
-            href={`/condominium/${params.id}/payment-methods`}
+            href={`/condominium/${condominiumId}/payment-methods`}
             className="flex h-10 items-center rounded-full border border-zinc-200 px-5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
           >
             Cancelar

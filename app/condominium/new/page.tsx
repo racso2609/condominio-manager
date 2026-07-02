@@ -5,15 +5,17 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
-import { createCondominium } from "@/lib/services/condominiumService";
+import { useCreateCondominium } from "@/lib/mutations/useCondominiumMutations";
 
 export default function NewCondominium() {
   const { appUser } = useAuthContext();
   const router = useRouter();
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  const { mutate: createCondominium, isPending: submitting } =
+    useCreateCondominium();
 
   const canCreate = appUser?.role === "admin" || appUser?.role === "administrator";
 
@@ -35,23 +37,25 @@ export default function NewCondominium() {
     );
   }
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !address.trim()) return;
-    setSubmitting(true);
+    if (!name.trim() || !address.trim() || !appUser) return;
     setError("");
 
-    try {
-      const condo = await createCondominium({
+    createCondominium(
+      {
         name: name.trim(),
         address: address.trim(),
-        creator: appUser!.id,
-      });
-      router.push(`/condominium/${condo.id}`);
-    } catch {
-      setError("Ocurrió un error al crear el condominio. Intenta de nuevo.");
-      setSubmitting(false);
-    }
+        creator: appUser.id,
+      },
+      {
+        onSuccess: (condo) => router.push(`/condominium/${condo.id}`),
+        onError: () =>
+          setError(
+            "Ocurrió un error al crear el condominio. Intenta de nuevo."
+          ),
+      }
+    );
   };
 
   return (

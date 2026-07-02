@@ -5,12 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
-import {
-  getCondominium,
-  getUserCondominiumRole,
-} from "@/lib/services/condominiumService";
-import { createComplaint } from "@/lib/services/complaintService";
-import { Condominium, CondominiumRole } from "@/lib/types";
+import { useCondominium, useUserCondominiumRole } from "@/lib/queries/useCondominium";
+import { useCreateComplaint } from "@/lib/mutations/useComplaintMutations";
 import { FormSkeleton } from "@/components/skeleton";
 
 const ALLOWED_TYPES = [
@@ -28,46 +24,42 @@ export default function NewComplaintPage() {
   const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
-  const [condominium, setCondominium] = useState<Condominium | null>(null);
-  const [userRole, setUserRole] = useState<CondominiumRole | null>(null);
-  const [loading, setLoading] = useState(true);
+  const condominiumId = params.id as string;
+
+  const { data: condominium, isLoading: condominiumLoading } =
+    useCondominium(condominiumId);
+  const { data: userRole, isLoading: roleLoading } = useUserCondominiumRole(
+    appUser?.id,
+    condominiumId
+  );
+
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [files, setFiles] = useState<File[]>([]);
-  const [saving, setSaving] = useState(false);
+
+  const { mutate: createComplaint, isPending: saving } = useCreateComplaint();
 
   const isGlobalAdmin = appUser?.role === "admin";
   const canCreate =
-    isGlobalAdmin ||
-    (userRole?.role === "resident" && !!userRole?.user);
+    isGlobalAdmin || (userRole?.role === "resident" && !!userRole?.user);
 
   useEffect(() => {
-    if (!params.id || !appUser) return;
-    const id = params.id as string;
-
-    const load = async () => {
-      const [condo, role] = await Promise.all([
-        getCondominium(id),
-        getUserCondominiumRole(appUser.id, id),
-      ]);
-
-      if (!condo) {
-        router.replace("/home");
-        return;
-      }
-
-      if (!isGlobalAdmin && !role) {
-        router.replace("/home");
-        return;
-      }
-
-      setCondominium(condo);
-      setUserRole(role);
-      setLoading(false);
-    };
-
-    load();
-  }, [params.id, router, appUser, isGlobalAdmin]);
+    if (condominiumLoading || roleLoading) return;
+    if (condominium === null) {
+      router.replace("/home");
+      return;
+    }
+    if (!isGlobalAdmin && !userRole) {
+      router.replace("/home");
+    }
+  }, [
+    condominiumLoading,
+    roleLoading,
+    condominium,
+    userRole,
+    isGlobalAdmin,
+    router,
+  ]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files ?? []);
@@ -88,27 +80,30 @@ export default function NewComplaintPage() {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!appUser || !params.id || !canCreate) return;
-    setSaving(true);
-    try {
-      const complaint = await createComplaint({
-        condominium: params.id as string,
+    if (!appUser || !canCreate) return;
+
+    createComplaint(
+      {
+        condominium: condominiumId,
         title: title.trim(),
         content: content.trim(),
         author: appUser.id,
         files: files.length > 0 ? files : undefined,
-      });
-      router.push(
-        `/condominium/${params.id}/complaints?id=${complaint.id}`
-      );
-    } catch {
-      alert("Error al registrar la queja");
-    } finally {
-      setSaving(false);
-    }
+      },
+      {
+        onSuccess: (complaint) => {
+          router.push(
+            `/condominium/${condominiumId}/complaints?id=${complaint.id}`
+          );
+        },
+        onError: () => alert("Error al registrar la queja"),
+      }
+    );
   };
+
+  const loading = condominiumLoading || roleLoading;
 
   if (loading) {
     return <FormSkeleton titleWidth="w-40" inputCount={3} />;
@@ -258,7 +253,7 @@ export default function NewComplaintPage() {
             {saving ? "Registrando..." : "Registrar queja"}
           </Button>
           <Button
-            href={`/condominium/${params.id}/complaints`}
+            href={`/condominium/${condominiumId}/complaints`}
             variant="secondary"
             size="lg"
           >

@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
+import { useCondominium, useCondominiumRoles } from "@/lib/queries/useCondominium";
 import {
-  getCondominium,
-  createInvite,
-  createGlobalInvite,
-  getCondominiumRoles,
-} from "@/lib/services/condominiumService";
-import { Condominium, CondominiumRole } from "@/lib/types";
+  useCreateInvite,
+  useCreateGlobalInvite,
+} from "@/lib/mutations/useCondominiumMutations";
+import { CondominiumRole } from "@/lib/types";
 import { InviteSkeleton } from "@/components/skeleton";
 
 const BASE_URL = typeof window !== "undefined" ? window.location.origin : "";
@@ -19,14 +18,21 @@ export default function InviteResidentPage() {
   const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
-  const [condominium, setCondominium] = useState<Condominium | null>(null);
-  const [roles, setRoles] = useState<CondominiumRole[]>([]);
+  const condominiumId = params.id as string;
+
+  const { data: condominium, isLoading: condominiumLoading } =
+    useCondominium(condominiumId);
+  const { data: roles = [], isLoading: rolesLoading } =
+    useCondominiumRoles(condominiumId);
+
   const [email, setEmail] = useState("");
-  const [sending, setSending] = useState(false);
   const [lastLink, setLastLink] = useState("");
-  const [generatingGlobal, setGeneratingGlobal] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
+
+  const { mutate: createInvite, isPending: sending } = useCreateInvite();
+  const { mutate: createGlobalInvite, isPending: generatingGlobal } =
+    useCreateGlobalInvite();
+
   const isAdminOrManager =
     appUser?.role === "admin" || appUser?.role === "administrator";
 
@@ -35,56 +41,53 @@ export default function InviteResidentPage() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (!condominiumLoading && condominium === null) {
+      router.replace("/home");
+    }
+  }, [condominiumLoading, condominium, router]);
+
   const isExpired = (role: CondominiumRole) =>
     !!role.expires_at && role.expires_at.toMillis() < now;
 
-  const globalInvite = roles.find(
+  const tokenRoles = useMemo(
+    () => roles.filter((role) => role.token),
+    [roles]
+  );
+
+  const globalInvite = tokenRoles.find(
     (r) => !r.invited_email && r.token && !isExpired(r)
   );
   const globalLink = globalInvite
     ? `${BASE_URL}/invite?token=${globalInvite.token}`
     : "";
 
-  useEffect(() => {
-    if (!params.id) return;
-    const id = params.id as string;
-    Promise.all([getCondominium(id), getCondominiumRoles(id)]).then(([c, r]) => {
-      if (!c) router.replace("/home");
-      else {
-        setCondominium(c);
-        setRoles(r.filter((role) => role.token));
-      }
-      setLoading(false);
-    });
-  }, [params.id, router]);
-
-  const handleInvite = async (e: React.FormEvent) => {
+  const handleInvite = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !appUser || !condominium) return;
-    setSending(true);
-    try {
-      const role = await createInvite(condominium.id, appUser.id, email.trim());
-      setRoles((prev) => [...prev, role]);
-      setLastLink(`${BASE_URL}/invite?token=${role.token}`);
-      setEmail("");
-    } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Error al enviar invitación");
-    } finally {
-      setSending(false);
-    }
+
+    createInvite(
+      {
+        condominiumId: condominium.id,
+        invitedBy: appUser.id,
+        email: email.trim(),
+      },
+      {
+        onSuccess: (role) => {
+          setLastLink(`${BASE_URL}/invite?token=${role.token}`);
+          setEmail("");
+        },
+      }
+    );
   };
 
-  const handleCreateGlobalInvite = async () => {
+  const handleCreateGlobalInvite = () => {
     if (!appUser || !condominium) return;
-    setGeneratingGlobal(true);
-    try {
-      const role = await createGlobalInvite(condominium.id, appUser.id);
-      setRoles((prev) => [...prev, role]);
-    } catch {
-      alert("Error al generar el link de invitación");
-    } finally {
-      setGeneratingGlobal(false);
-    }
+
+    createGlobalInvite({
+      condominiumId: condominium.id,
+      invitedBy: appUser.id,
+    });
   };
 
   const copyLink = (token: string) => {
@@ -94,6 +97,8 @@ export default function InviteResidentPage() {
   const copyFromRole = (role: CondominiumRole) => {
     if (role.token) copyLink(role.token);
   };
+
+  const loading = condominiumLoading || rolesLoading;
 
   if (loading) {
     return <InviteSkeleton />;
@@ -182,7 +187,8 @@ export default function InviteResidentPage() {
           Invitación grupal
         </h2>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Genera un link que puedes compartir en un grupo para que cualquier persona se una al condominio.
+          Genera un link que puedes compartir en un grupo para que cualquier
+          persona se una al condominio.
         </p>
         {globalLink ? (
           <div className="mt-4 flex gap-2">
@@ -207,13 +213,13 @@ export default function InviteResidentPage() {
         )}
       </div>
 
-      {roles.length > 0 && (
+      {tokenRoles.length > 0 && (
         <section>
           <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
             Invitaciones enviadas
           </h2>
           <div className="flex flex-col gap-2">
-            {roles.map((r) => (
+            {tokenRoles.map((r) => (
               <div
                 key={r.id}
                 className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-black"
