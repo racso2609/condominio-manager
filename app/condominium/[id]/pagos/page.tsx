@@ -38,6 +38,16 @@ const TYPE_LABELS: Record<PaymentMethodType, string> = {
   other: "Otro",
 };
 
+interface DollarRate {
+  moneda: string;
+  fuente: string;
+  nombre: string;
+  compra: number | null;
+  venta: number | null;
+  promedio: number;
+  fechaActualizacion: string;
+}
+
 export default function ResidentPagosPage() {
   const { appUser } = useAuthContext();
   const params = useParams();
@@ -49,6 +59,7 @@ export default function ResidentPagosPage() {
   const [buildings, setBuildings] = useState<Record<string, Building>>({});
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dolarRate, setDolarRate] = useState<number | null>(null);
 
   const [reportingEntryId, setReportingEntryId] = useState<string | null>(null);
   const [reportPaymentMethod, setReportPaymentMethod] = useState("");
@@ -116,6 +127,23 @@ export default function ResidentPagosPage() {
       setLoading(false);
     });
   }, [appUser, params.id, router]);
+
+  useEffect(() => {
+    if (!condominium) return;
+    fetch("https://ve.dolarapi.com/v1/dolares")
+      .then((res) => res.json())
+      .then((rates: DollarRate[]) => {
+        const parallel = rates.find((r) => r.fuente === "paralelo");
+        if (parallel?.promedio) setDolarRate(parallel.promedio);
+      })
+      .catch(() => setDolarRate(null));
+  }, [condominium]);
+
+  const formatBs = (amount: number) =>
+    amount.toLocaleString("es-VE", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
 
   const handleReportPayment = async (entryId: string) => {
     if (!appUser) return;
@@ -213,6 +241,11 @@ export default function ResidentPagosPage() {
               <p className="mt-1 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
                 ${totalPending.toFixed(2)}
               </p>
+              {dolarRate && (
+                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  ≈ Bs {formatBs(totalPending * dolarRate)}
+                </p>
+              )}
             </div>
             <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-black">
               <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
@@ -221,6 +254,11 @@ export default function ResidentPagosPage() {
               <p className="mt-1 text-2xl font-semibold text-emerald-600 dark:text-emerald-400">
                 ${totalPaid.toFixed(2)}
               </p>
+              {dolarRate && (
+                <p className="mt-1 text-xs text-emerald-600/80 dark:text-emerald-400/80">
+                  ≈ Bs {formatBs(totalPaid * dolarRate)}
+                </p>
+              )}
             </div>
           </div>
 
@@ -247,6 +285,9 @@ export default function ResidentPagosPage() {
                       building={unit ? buildings[unit.building] : undefined}
                       showReportButton
                       onReport={() => setReportingEntryId(entry.id)}
+                      vesAmount={
+                        dolarRate ? entry.amount * dolarRate : undefined
+                      }
                     />
 
                     {isReporting && (

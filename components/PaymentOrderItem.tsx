@@ -21,6 +21,7 @@ interface PaymentOrderItemProps {
   onValidate?: (note: string) => void;
   isValidating?: boolean;
   className?: string;
+  vesAmount?: number;
 }
 
 export default function PaymentOrderItem({
@@ -34,6 +35,7 @@ export default function PaymentOrderItem({
   onValidate,
   isValidating,
   className = "",
+  vesAmount,
 }: PaymentOrderItemProps) {
   const [note, setNote] = useState(entry.notes ?? "");
 
@@ -70,6 +72,15 @@ export default function PaymentOrderItem({
           <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
             ${entry.amount.toFixed(2)}
           </p>
+          {vesAmount !== undefined && (
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              ≈ Bs{" "}
+              {vesAmount.toLocaleString("es-VE", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </p>
+          )}
           <span
             className={`inline-block mt-1 rounded-full px-2.5 py-0.5 text-[10px] font-medium ${
               entry.status === "paid"
