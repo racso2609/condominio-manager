@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
 import { getBuilding, updateBuilding } from "@/lib/services/buildingService";
+import { FormSkeleton } from "@/components/skeleton";
 
 export default function EditBuilding() {
   const { appUser } = useAuthContext();
@@ -54,11 +55,7 @@ export default function EditBuilding() {
   }
 
   if (loading) {
-    return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <div className="h-48 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900" />
-      </div>
-    );
+    return <FormSkeleton titleWidth="w-40" inputCount={3} />;
   }
 
   const handleSubmit = async (e: FormEvent) => {

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
 import { updateUser } from "@/lib/services/userService";
+import { ProfileSkeleton } from "@/components/skeleton";
 
 export default function ProfilePage() {
   const { user, appUser } = useAuthContext();
@@ -36,6 +37,10 @@ export default function ProfilePage() {
       setSaving(false);
     }
   };
+
+  if (!appUser) {
+    return <ProfileSkeleton />;
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-8 px-4 py-8">

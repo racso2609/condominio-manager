@@ -42,6 +42,7 @@ import {
 import { Button } from "@/components/Button";
 import Collapse from "@/components/Collapse";
 import PaymentOrderItem from "@/components/PaymentOrderItem";
+import { ResidentsSkeleton } from "@/components/skeleton";
 
 const TYPE_LABELS: Record<PaymentMethodType, string> = {
   bank_transfer: "Transferencia bancaria",
@@ -347,11 +348,7 @@ export default function ResidentsPage() {
   );
 
   if (loading) {
-    return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <div className="h-48 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900" />
-      </div>
-    );
+    return <ResidentsSkeleton />;
   }
 
   if (!condominium) return null;

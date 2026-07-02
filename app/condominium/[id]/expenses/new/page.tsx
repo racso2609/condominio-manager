@@ -11,6 +11,7 @@ import { getUnitsByBuilding } from "@/lib/services/unitService";
 import { createExpense } from "@/lib/services/expenseService";
 import { createExpenseEntries } from "@/lib/services/expenseEntryService";
 import { Condominium, Building, Unit } from "@/lib/types";
+import { FormSkeleton } from "@/components/skeleton";
 
 export default function NewExpensePage() {
   const { appUser } = useAuthContext();
@@ -115,11 +116,7 @@ export default function NewExpensePage() {
   };
 
   if (loading) {
-    return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <div className="h-48 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900" />
-      </div>
-    );
+    return <FormSkeleton titleWidth="w-40" inputCount={6} />;
   }
 
   if (!isAdminOrManager) {

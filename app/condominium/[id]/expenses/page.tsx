@@ -10,6 +10,7 @@ import { getBuildingsByCondominium } from "@/lib/services/buildingService";
 import { getExpensesByCondominium } from "@/lib/services/expenseService";
 import { getEntriesByExpense } from "@/lib/services/expenseEntryService";
 import { Condominium, Building, Expense } from "@/lib/types";
+import { PageSkeleton } from "@/components/skeleton";
 
 export default function ExpensesPage() {
   const { appUser } = useAuthContext();
@@ -50,11 +51,7 @@ export default function ExpensesPage() {
   }, [params.id, router]);
 
   if (loading) {
-    return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <div className="h-48 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900" />
-      </div>
-    );
+    return <PageSkeleton titleWidth="w-32" cardCount={4} cardLines={2} />;
   }
 
   if (!condominium) return null;

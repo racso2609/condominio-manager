@@ -27,6 +27,7 @@ import {
   PaymentMethodType,
 } from "@/lib/types";
 import PaymentOrderItem from "@/components/PaymentOrderItem";
+import { PaymentsSkeleton } from "@/components/skeleton";
 
 const TYPE_LABELS: Record<PaymentMethodType, string> = {
   bank_transfer: "Transferencia bancaria",
@@ -190,11 +191,7 @@ export default function ResidentPagosPage() {
   const totalPaid = paidEntries.reduce((s, e) => s + e.amount, 0);
 
   if (loading) {
-    return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <div className="h-48 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900" />
-      </div>
-    );
+    return <PaymentsSkeleton />;
   }
 
   if (!condominium) return null;

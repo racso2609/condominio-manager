@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuthContext } from "@/context/authContext";
 import { Button } from "@/components/Button";
+import { AppInviteSkeleton } from "@/components/skeleton";
 import { getInviteByToken, acceptInvite } from "@/lib/services/condominiumService";
 import { getCondominium } from "@/lib/services/condominiumService";
 import { CondominiumRole, Condominium } from "@/lib/types";
@@ -73,11 +74,7 @@ function InviteContent() {
   };
 
   if (loading || authLoading) {
-    return (
-      <div className="mx-auto flex max-w-lg flex-1 items-center justify-center px-4">
-        <div className="h-48 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900" />
-      </div>
-    );
+    return <AppInviteSkeleton />;
   }
 
   if (error) {
@@ -168,13 +165,7 @@ function InviteContent() {
 
 export default function InvitePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="mx-auto flex max-w-lg flex-1 items-center justify-center px-4">
-          <div className="h-48 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900" />
-        </div>
-      }
-    >
+    <Suspense fallback={<AppInviteSkeleton />}>
       <InviteContent />
     </Suspense>
   );

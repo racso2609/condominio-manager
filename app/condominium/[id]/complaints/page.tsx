@@ -26,6 +26,7 @@ import {
   Unit,
   Building,
 } from "@/lib/types";
+import { PageSkeleton } from "@/components/skeleton";
 
 const STATUS_LABELS: Record<ComplaintStatus, string> = {
   pending: "Pendiente",
@@ -168,11 +169,7 @@ export default function ComplaintsPage() {
   };
 
   if (loading) {
-    return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <div className="h-48 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900" />
-      </div>
-    );
+    return <PageSkeleton titleWidth="w-32" cardCount={3} cardLines={4} />;
   }
 
   if (!condominium) return null;

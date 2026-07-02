@@ -16,6 +16,7 @@ import {
 } from "@/lib/services/unitService";
 import { getUser } from "@/lib/services/userService";
 import { Building, Unit, AppUser } from "@/lib/types";
+import { BuildingDetailSkeleton } from "@/components/skeleton";
 
 export default function BuildingDetail() {
   const { appUser } = useAuthContext();
@@ -181,11 +182,7 @@ export default function BuildingDetail() {
   };
 
   if (loading) {
-    return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <div className="h-48 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900" />
-      </div>
-    );
+    return <BuildingDetailSkeleton />;
   }
 
   if (!building) return null;

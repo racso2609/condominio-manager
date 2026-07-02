@@ -11,6 +11,7 @@ import { getUnitsByBuilding } from "@/lib/services/unitService";
 import { getEntriesByUnits } from "@/lib/services/expenseEntryService";
 import { Condominium, Building, Unit, ExpenseEntry, CondominiumRole } from "@/lib/types";
 import StatusBadge from "@/components/StatusBadge";
+import { CondominiumDetailSkeleton } from "@/components/skeleton";
 
 export default function CondominiumDetail() {
   const { appUser } = useAuthContext();
@@ -92,11 +93,7 @@ export default function CondominiumDetail() {
   };
 
   if (loading) {
-    return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <div className="h-48 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900" />
-      </div>
-    );
+    return <CondominiumDetailSkeleton />;
   }
 
   if (!condominium) return null;

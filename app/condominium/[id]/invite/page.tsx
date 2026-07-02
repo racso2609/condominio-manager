@@ -11,6 +11,7 @@ import {
   getCondominiumRoles,
 } from "@/lib/services/condominiumService";
 import { Condominium, CondominiumRole } from "@/lib/types";
+import { InviteSkeleton } from "@/components/skeleton";
 
 const BASE_URL = typeof window !== "undefined" ? window.location.origin : "";
 
@@ -95,11 +96,7 @@ export default function InviteResidentPage() {
   };
 
   if (loading) {
-    return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <div className="h-48 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900" />
-      </div>
-    );
+    return <InviteSkeleton />;
   }
 
   if (!condominium) return null;

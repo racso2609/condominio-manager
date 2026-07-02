@@ -7,6 +7,7 @@ import { useAuthContext } from "@/context/authContext";
 import { getCondominium } from "@/lib/services/condominiumService";
 import { createPaymentMethod } from "@/lib/services/paymentMethodService";
 import { Condominium, PaymentMethodType } from "@/lib/types";
+import { FormSkeleton } from "@/components/skeleton";
 
 const TYPE_OPTIONS: { value: PaymentMethodType; label: string }[] = [
   { value: "bank_transfer", label: "Transferencia bancaria" },
@@ -115,11 +116,7 @@ export default function NewPaymentMethodPage() {
   };
 
   if (loading) {
-    return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <div className="h-48 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900" />
-      </div>
-    );
+    return <FormSkeleton titleWidth="w-56" inputCount={7} />;
   }
 
   if (!isAdminOrManager) {

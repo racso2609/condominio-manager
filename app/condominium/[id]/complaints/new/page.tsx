@@ -11,6 +11,7 @@ import {
 } from "@/lib/services/condominiumService";
 import { createComplaint } from "@/lib/services/complaintService";
 import { Condominium, CondominiumRole } from "@/lib/types";
+import { FormSkeleton } from "@/components/skeleton";
 
 const ALLOWED_TYPES = [
   "image/jpeg",
@@ -110,11 +111,7 @@ export default function NewComplaintPage() {
   };
 
   if (loading) {
-    return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <div className="h-48 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900" />
-      </div>
-    );
+    return <FormSkeleton titleWidth="w-40" inputCount={3} />;
   }
 
   if (!canCreate) {

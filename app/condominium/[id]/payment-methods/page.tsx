@@ -11,6 +11,7 @@ import {
   deletePaymentMethod,
 } from "@/lib/services/paymentMethodService";
 import { Condominium, PaymentMethod, PaymentMethodType } from "@/lib/types";
+import { PageSkeleton } from "@/components/skeleton";
 
 const TYPE_LABELS: Record<PaymentMethodType, string> = {
   bank_transfer: "Transferencia bancaria",
@@ -64,11 +65,7 @@ export default function PaymentMethodsPage() {
   };
 
   if (loading) {
-    return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <div className="h-48 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900" />
-      </div>
-    );
+    return <PageSkeleton titleWidth="w-48" cardCount={3} cardLines={3} />;
   }
 
   if (!isAdminOrManager) {

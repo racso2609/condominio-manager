@@ -12,6 +12,7 @@ import {
 } from "@/lib/services/announcementService";
 import { getUser } from "@/lib/services/userService";
 import { Condominium, Announcement, AppUser } from "@/lib/types";
+import { PageSkeleton } from "@/components/skeleton";
 
 export default function AnnouncementsPage() {
   const { appUser } = useAuthContext();
@@ -62,11 +63,7 @@ export default function AnnouncementsPage() {
   };
 
   if (loading) {
-    return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <div className="h-48 w-full animate-pulse rounded-xl bg-zinc-100 dark:bg-zinc-900" />
-      </div>
-    );
+    return <PageSkeleton titleWidth="w-40" cardCount={3} cardLines={4} />;
   }
 
   if (!condominium) return null;
