@@ -24,7 +24,7 @@ export default function NewExpensePage() {
     useBuildingsByCondominium(condominiumId);
 
   const [scope, setScope] = useState<"condominium" | "building">("condominium");
-  const [selectedBuilding, setSelectedBuilding] = useState("");
+  const [selectedBuilding, setSelectedBuilding] = useState(buildings[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
@@ -32,11 +32,7 @@ export default function NewExpensePage() {
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
 
-  useEffect(() => {
-    if (buildings.length > 0 && !selectedBuilding) {
-      setSelectedBuilding(buildings[0].id);
-    }
-  }, [buildings, selectedBuilding]);
+  const effectiveSelectedBuilding = selectedBuilding || buildings[0]?.id || "";
 
   const buildingIds = useMemo(() => buildings.map((b) => b.id), [buildings]);
   const unitsQueries = useUnitsByBuildings(buildingIds);
@@ -47,8 +43,8 @@ export default function NewExpensePage() {
 
   const scopeUnits = useMemo(() => {
     if (scope === "condominium") return allUnits;
-    return allUnits.filter((u) => u.building === selectedBuilding);
-  }, [scope, allUnits, selectedBuilding]);
+    return allUnits.filter((u) => u.building === effectiveSelectedBuilding);
+  }, [scope, allUnits, effectiveSelectedBuilding]);
 
   const { mutate: createExpense, isPending: creatingExpense } =
     useCreateExpense();
@@ -96,7 +92,7 @@ export default function NewExpensePage() {
     createExpense(
       {
         condominium: scope === "condominium" ? condominiumId : undefined,
-        building: scope === "building" ? selectedBuilding : undefined,
+        building: scope === "building" ? effectiveSelectedBuilding : undefined,
         title: title.trim(),
         description: description.trim() || undefined,
         amount: totalAmount,
@@ -205,7 +201,7 @@ export default function NewExpensePage() {
                 Edificio
               </span>
               <select
-                value={selectedBuilding}
+                value={effectiveSelectedBuilding}
                 onChange={(e) => setSelectedBuilding(e.target.value)}
                 required
                 className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"

@@ -1,42 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
+import { useCondominium, useCondominiumRoles } from "@/lib/queries/useCondominium";
+import { useBuildingsByCondominium } from "@/lib/queries/useBuilding";
+import { useUnitsByBuildings } from "@/lib/queries/useUnit";
+import { useUsers } from "@/lib/queries/useUser";
 import {
-  getCondominium,
-  getCondominiumRoles,
-  verifyRole,
-  deleteCondominiumRole,
-} from "@/lib/services/condominiumService";
-import { getBuildingsByCondominium } from "@/lib/services/buildingService";
+  useExpensesByCondominium,
+  useExpensesByBuildings,
+} from "@/lib/queries/useExpense";
+import { useEntriesByExpenses } from "@/lib/queries/useExpenseEntry";
+import { usePaymentMethodsByCondominium } from "@/lib/queries/usePaymentMethod";
 import {
-  getUnitsByBuilding,
-  verifyUnitOwner,
-  rejectUnitClaim,
-  removeUnitOwner,
-  assignUnitOwner,
-} from "@/lib/services/unitService";
-import { getUser } from "@/lib/services/userService";
+  useRejectUnitClaim,
+  useRemoveUnitOwner,
+  useVerifyUnitOwner,
+  useAssignUnitOwner,
+} from "@/lib/mutations/useUnitMutations";
 import {
-  getExpensesByCondominium,
-  getExpensesByBuilding,
-} from "@/lib/services/expenseService";
+  useVerifyRole,
+  useDeleteCondominiumRole,
+} from "@/lib/mutations/useCondominiumMutations";
+import { useMarkEntryAsPaid } from "@/lib/mutations/useExpenseEntryMutations";
 import {
-  getEntriesByExpense,
-  markEntryAsPaid,
-} from "@/lib/services/expenseEntryService";
-import { getPaymentMethodsByCondominium } from "@/lib/services/paymentMethodService";
-import {
-  Condominium,
   CondominiumRole,
-  Building,
   Unit,
-  AppUser,
-  Expense,
+  Building,
   ExpenseEntry,
-  PaymentMethod,
   PaymentMethodType,
 } from "@/lib/types";
 import { Button } from "@/components/Button";
@@ -58,134 +51,126 @@ export default function ResidentsPage() {
   const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
-  const [condominium, setCondominium] = useState<Condominium | null>(null);
-  const [roles, setRoles] = useState<CondominiumRole[]>([]);
-  const [buildings, setBuildings] = useState<Building[]>([]);
-  const [allUnits, setAllUnits] = useState<Unit[]>([]);
-  const [pendingUnits, setPendingUnits] = useState<Unit[]>([]);
-  const [unitsByOwner, setUnitsByOwner] = useState<Record<string, Unit[]>>({});
-  const [owners, setOwners] = useState<Record<string, AppUser>>({});
+  const condominiumId = params.id as string;
+
+  const { data: condominium, isLoading: condominiumLoading } =
+    useCondominium(condominiumId);
+  const { data: roles = [], isLoading: rolesLoading } =
+    useCondominiumRoles(condominiumId);
+  const { data: buildings = [], isLoading: buildingsLoading } =
+    useBuildingsByCondominium(condominiumId);
+  const { data: paymentMethods = [], isLoading: methodsLoading } =
+    usePaymentMethodsByCondominium(condominiumId);
+
+  const buildingIds = useMemo(() => buildings.map((b) => b.id), [buildings]);
+  const unitsQueries = useUnitsByBuildings(buildingIds);
+
+  const allUnits = useMemo(() => {
+    return unitsQueries.flatMap((q) => q.data ?? []);
+  }, [unitsQueries]);
+
+  const pendingUnits = useMemo(
+    () => allUnits.filter((u) => u.owner_status === "pending"),
+    [allUnits]
+  );
+
+  const unitsByOwner = useMemo(() => {
+    const map: Record<string, Unit[]> = {};
+    allUnits.forEach((u) => {
+      if (u.owner) {
+        if (!map[u.owner]) map[u.owner] = [];
+        map[u.owner].push(u);
+      }
+    });
+    return map;
+  }, [allUnits]);
+
+  const ownerIds = useMemo(() => {
+    const ids = new Set<string>();
+    allUnits.forEach((u) => {
+      if (u.owner) ids.add(u.owner);
+    });
+    roles.forEach((r) => {
+      if (r.role === "resident" && r.user) ids.add(r.user);
+    });
+    return Array.from(ids);
+  }, [allUnits, roles]);
+
+  const ownersQueries = useUsers(ownerIds);
+
+  const owners = useMemo(() => {
+    const map: Record<string, import("@/lib/types").AppUser> = {};
+    ownersQueries.forEach((q) => {
+      if (q.data) map[q.data.id] = q.data;
+    });
+    return map;
+  }, [ownersQueries]);
+
+  const { data: condoExpenses = [], isLoading: condoExpensesLoading } =
+    useExpensesByCondominium(condominiumId);
+  const buildingExpensesQueries = useExpensesByBuildings(buildingIds);
+
+  const expenses = useMemo(() => {
+    const map: Record<string, import("@/lib/types").Expense> = {};
+    condoExpenses.forEach((e) => (map[e.id] = e));
+    buildingExpensesQueries.forEach((q) => {
+      if (q.data) q.data.forEach((e) => (map[e.id] = e));
+    });
+    return map;
+  }, [condoExpenses, buildingExpensesQueries]);
+
+  const expenseIds = useMemo(() => Object.keys(expenses), [expenses]);
+  const entriesQueries = useEntriesByExpenses(expenseIds);
+
+  const entriesByUnit = useMemo(() => {
+    const map: Record<string, ExpenseEntry[]> = {};
+    entriesQueries.forEach((q) => {
+      if (q.data) {
+        q.data.forEach((entry) => {
+          if (!map[entry.unit]) map[entry.unit] = [];
+          map[entry.unit].push(entry);
+        });
+      }
+    });
+    return map;
+  }, [entriesQueries]);
+
   const [assigningForRole, setAssigningForRole] = useState<string | null>(null);
   const [assignBuildingId, setAssignBuildingId] = useState("");
   const [assignUnitId, setAssignUnitId] = useState("");
-  const [assigning, setAssigning] = useState(false);
-  const [expenses, setExpenses] = useState<Record<string, Expense>>({});
-  const [entriesByUnit, setEntriesByUnit] = useState<
-    Record<string, ExpenseEntry[]>
-  >({});
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [verifying, setVerifying] = useState<string | null>(null);
-  const [rejecting, setRejecting] = useState<string | null>(null);
   const [removingUnitId, setRemovingUnitId] = useState<string | null>(null);
-  const [validatingPaymentId, setValidatingPaymentId] = useState<string | null>(
-    null
-  );
+
+  const { mutate: rejectUnitClaim, isPending: rejecting } = useRejectUnitClaim();
+  const { mutate: removeUnitOwner, isPending: removing } = useRemoveUnitOwner();
+  const { mutate: verifyUnitOwner, isPending: verifyingUnit } =
+    useVerifyUnitOwner();
+  const { mutate: assignUnitOwner, isPending: assigning } = useAssignUnitOwner();
+  const { mutate: verifyRole } = useVerifyRole();
+  const { mutate: deleteCondominiumRole } = useDeleteCondominiumRole();
+  const { mutate: markEntryAsPaid, isPending: validatingPayment } =
+    useMarkEntryAsPaid();
+
   const isAdminOrManager =
     appUser?.role === "admin" || appUser?.role === "administrator";
 
   useEffect(() => {
-    if (!params.id) return;
-    const id = params.id as string;
-    Promise.all([
-      getCondominium(id),
-      getCondominiumRoles(id),
-      getBuildingsByCondominium(id),
-      getPaymentMethodsByCondominium(id),
-    ]).then(async ([c, r, b, methods]) => {
-      if (!c) {
-        router.replace("/home");
-        return;
-      }
-      setCondominium(c);
-      setRoles(r);
-      setBuildings(b);
-      setPaymentMethods(methods);
+    if (!condominiumLoading && condominium === null) {
+      router.replace("/home");
+    }
+  }, [condominiumLoading, condominium, router]);
 
-      const units: Unit[] = [];
-      const pending: Unit[] = [];
-      const ownerIds = new Set<string>();
-      const byOwner: Record<string, Unit[]> = {};
-
-      for (const building of b) {
-        const buildingUnits = await getUnitsByBuilding(building.id);
-        for (const u of buildingUnits) {
-          units.push(u);
-          if (u.owner) {
-            if (!byOwner[u.owner]) byOwner[u.owner] = [];
-            byOwner[u.owner].push(u);
-            ownerIds.add(u.owner);
-          }
-          if (u.owner_status === "pending") {
-            pending.push(u);
-          }
-        }
-      }
-      setAllUnits(units);
-      setPendingUnits(pending);
-      setUnitsByOwner(byOwner);
-
-      for (const role of r) {
-        if (role.role === "resident" && role.user) {
-          ownerIds.add(role.user);
-        }
-      }
-
-      const ownerMap: Record<string, AppUser> = {};
-      for (const oid of ownerIds) {
-        const owner = await getUser(oid);
-        if (owner) ownerMap[oid] = owner;
-      }
-      setOwners(ownerMap);
-
-      const expenseMap: Record<string, Expense> = {};
-      const condoExpenses = await getExpensesByCondominium(id);
-      for (const exp of condoExpenses) {
-        expenseMap[exp.id] = exp;
-      }
-      const buildingExpenses = await Promise.all(
-        b.map((building) => getExpensesByBuilding(building.id))
-      );
-      for (const exps of buildingExpenses) {
-        for (const exp of exps) {
-          expenseMap[exp.id] = exp;
-        }
-      }
-      setExpenses(expenseMap);
-
-      const entriesMap: Record<string, ExpenseEntry[]> = {};
-      for (const exp of Object.values(expenseMap)) {
-        const entries = await getEntriesByExpense(exp.id);
-        for (const entry of entries) {
-          if (!entriesMap[entry.unit]) entriesMap[entry.unit] = [];
-          entriesMap[entry.unit].push(entry);
-        }
-      }
-      setEntriesByUnit(entriesMap);
-
-      setLoading(false);
-    });
-  }, [params.id, router]);
-
-  const handleReject = async (unitId: string) => {
+  const handleReject = (unitId: string) => {
     if (
       !window.confirm(
         "¿Rechazar esta solicitud? El usuario no podrá reclamar esta unidad por 1 semana."
       )
     )
       return;
-    setRejecting(unitId);
-    try {
-      await rejectUnitClaim(unitId);
-      setPendingUnits((prev) => prev.filter((u) => u.id !== unitId));
-    } catch {
-      alert("Error al rechazar");
-    } finally {
-      setRejecting(null);
-    }
+
+    rejectUnitClaim(unitId);
   };
 
-  const handleRemoveOwner = async (
+  const handleRemoveOwner = (
     unitId: string,
     ownerId: string,
     roleId: string
@@ -200,111 +185,53 @@ export default function ResidentsPage() {
       return;
 
     setRemovingUnitId(unitId);
-    try {
-      await removeUnitOwner(unitId);
-
-      setUnitsByOwner((prev) => {
-        const ownerUnits = prev[ownerId] ?? [];
-        const remaining = ownerUnits.filter((u) => u.id !== unitId);
-        const next = { ...prev };
-        if (remaining.length === 0) {
-          delete next[ownerId];
-        } else {
-          next[ownerId] = remaining;
+    removeUnitOwner(unitId, {
+      onSuccess: () => {
+        const remainingCount = (unitsByOwner[ownerId] ?? []).filter(
+          (u) => u.id !== unitId
+        ).length;
+        const removedRole = roles.find((r) => r.id === roleId);
+        if (remainingCount === 0 && removedRole?.role === "resident") {
+          deleteCondominiumRole(roleId);
         }
-        return next;
-      });
-
-      const remainingCount = (unitsByOwner[ownerId] ?? []).filter(
-        (u) => u.id !== unitId
-      ).length;
-      const removedRole = roles.find((r) => r.id === roleId);
-      if (remainingCount === 0 && removedRole?.role === "resident") {
-        await deleteCondominiumRole(roleId);
-        setRoles((prev) => prev.filter((r) => r.id !== roleId));
-      }
-    } catch {
-      alert(`Error al ${action} la propiedad`);
-    } finally {
-      setRemovingUnitId(null);
-    }
+        setRemovingUnitId(null);
+      },
+      onError: () => {
+        alert(`Error al ${action} la propiedad`);
+        setRemovingUnitId(null);
+      },
+    });
   };
 
-  const handleVerify = async (unitId: string, roleId: string) => {
-    setVerifying(unitId);
-    try {
-      await verifyUnitOwner(unitId);
-      await verifyRole(roleId);
-      setPendingUnits((prev) => prev.filter((u) => u.id !== unitId));
-      setRoles((prev) =>
-        prev.map((r) =>
-          r.id === roleId ? { ...r, status: "verified" as const } : r
-        )
-      );
-    } catch {
-      alert("Error al validar");
-    } finally {
-      setVerifying(null);
-    }
+  const handleVerify = (unitId: string, roleId: string) => {
+    verifyUnitOwner(unitId, {
+      onSuccess: () => verifyRole(roleId),
+    });
   };
 
-  const handleAssignUnit = async (residentId: string) => {
+  const handleAssignUnit = (residentId: string) => {
     if (!assignUnitId) return;
-    setAssigning(true);
-    try {
-      await assignUnitOwner(assignUnitId, residentId);
-      const unit = allUnits.find((u) => u.id === assignUnitId);
-      if (unit) {
-        const updatedUnit = { ...unit, owner: residentId, owner_status: "verified" as const };
-        setAllUnits((prev) =>
-          prev.map((u) => (u.id === assignUnitId ? updatedUnit : u))
-        );
-        setUnitsByOwner((prev) => {
-          const next = { ...prev };
-          if (!next[residentId]) next[residentId] = [];
-          next[residentId] = [...next[residentId], updatedUnit];
-          return next;
-        });
+
+    assignUnitOwner(
+      { unitId: assignUnitId, userId: residentId },
+      {
+        onSuccess: () => {
+          setAssigningForRole(null);
+          setAssignBuildingId("");
+          setAssignUnitId("");
+        },
+        onError: () => alert("Error al asignar la unidad"),
       }
-      setAssigningForRole(null);
-      setAssignBuildingId("");
-      setAssignUnitId("");
-    } catch {
-      alert("Error al asignar la unidad");
-    } finally {
-      setAssigning(false);
-    }
+    );
   };
 
-  const handleValidatePayment = async (entryId: string, note: string) => {
+  const handleValidatePayment = (entryId: string, note: string) => {
     if (!appUser) return;
-    setValidatingPaymentId(entryId);
-    try {
-      await markEntryAsPaid(entryId, {
-        notes: note,
-        validated_by: appUser.id,
-      });
-      setEntriesByUnit((prev) => {
-        const next: Record<string, ExpenseEntry[]> = {};
-        for (const [unitId, entries] of Object.entries(prev)) {
-          next[unitId] = entries.map((e) =>
-            e.id === entryId
-              ? {
-                  ...e,
-                  status: "paid",
-                  notes: note.trim() || e.notes,
-                  validated_by: appUser.id,
-                }
-              : e
-          );
-        }
-        return next;
-      });
-    } catch {
-      alert("Error al confirmar el pago");
-    } finally {
-      setValidatingPaymentId(null);
-    }
+
+    markEntryAsPaid({
+      id: entryId,
+      data: { notes: note, validated_by: appUser.id },
+    });
   };
 
   const getPendingEntriesForOwner = (ownerId: string): ExpenseEntry[] => {
@@ -346,6 +273,25 @@ export default function ResidentsPage() {
         return acc;
       }, {})
   );
+
+  const buildingsMap = useMemo(() => {
+    const map: Record<string, Building> = {};
+    buildings.forEach((b) => {
+      map[b.id] = b;
+    });
+    return map;
+  }, [buildings]);
+
+  const loading =
+    condominiumLoading ||
+    rolesLoading ||
+    buildingsLoading ||
+    methodsLoading ||
+    condoExpensesLoading ||
+    unitsQueries.some((q) => q.isLoading) ||
+    ownersQueries.some((q) => q.isLoading) ||
+    buildingExpensesQueries.some((q) => q.isLoading) ||
+    entriesQueries.some((q) => q.isLoading);
 
   if (loading) {
     return <ResidentsSkeleton />;
@@ -400,7 +346,7 @@ export default function ResidentsPage() {
           <div className="flex flex-col gap-3">
             {pendingUnits.map((u) => {
               const owner = owners[u.owner];
-              const building = buildings.find((b) => b.id === u.building);
+              const building = buildingsMap[u.building];
               const role = roles.find((r) => r.user === u.owner);
               return (
                 <div
@@ -438,20 +384,20 @@ export default function ResidentsPage() {
                     {role && (
                       <Button
                         onClick={() => handleVerify(u.id, role.id)}
-                        disabled={verifying === u.id}
+                        disabled={verifyingUnit}
                         variant="emerald"
                         size="md"
                       >
-                        {verifying === u.id ? "Validando..." : "Validar"}
+                        {verifyingUnit ? "Validando..." : "Validar"}
                       </Button>
                     )}
                     <Button
                       onClick={() => handleReject(u.id)}
-                      disabled={rejecting === u.id}
+                      disabled={rejecting}
                       variant="danger"
                       size="md"
                     >
-                      {rejecting === u.id ? "..." : "Rechazar"}
+                      {rejecting ? "..." : "Rechazar"}
                     </Button>
                   </div>
                 </div>
@@ -475,278 +421,274 @@ export default function ResidentsPage() {
         </h2>
         <div className="flex flex-col gap-2">
           {residentRoles.map((r) => {
-              const owner = owners[r.user] ?? null;
-              const units = unitsByOwner[r.user] ?? [];
-              const pendingEntries = getPendingEntriesForOwner(r.user);
-              const totalPending = getTotalPendingForOwner(r.user);
-              return (
-                <Collapse
-                  key={r.id}
-                  title={owner?.name ?? r.invited_email ?? "Pendiente"}
-                  subtitle={
-                    owner?.email
-                      ? [owner.email, owner.phone].filter(Boolean).join(" · ")
-                      : r.invited_email ?? ""
-                  }
-                  badge={
-                    <div className="flex items-center gap-2">
-                      {totalPending > 0 && (
-                        <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                          ${totalPending.toFixed(2)} pendiente
-                        </span>
-                      )}
-                      <span
-                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider ${
-                          r.status === "verified"
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                            : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                        }`}
-                      >
-                        {r.status === "verified" ? "Verificado" : "Pendiente"}
+            const owner = owners[r.user] ?? null;
+            const units = unitsByOwner[r.user] ?? [];
+            const pendingEntries = getPendingEntriesForOwner(r.user);
+            const totalPending = getTotalPendingForOwner(r.user);
+            return (
+              <Collapse
+                key={r.id}
+                title={owner?.name ?? r.invited_email ?? "Pendiente"}
+                subtitle={
+                  owner?.email
+                    ? [owner.email, owner.phone].filter(Boolean).join(" · ")
+                    : r.invited_email ?? ""
+                }
+                badge={
+                  <div className="flex items-center gap-2">
+                    {totalPending > 0 && (
+                      <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                        ${totalPending.toFixed(2)} pendiente
                       </span>
-                    </div>
-                  }
-                >
-                  {units.length === 0 ? (
-                    <div className="flex flex-col gap-3">
-                      <p className="text-sm text-zinc-400">
-                        Sin unidades asignadas
-                      </p>
-                      {assigningForRole === r.id ? (
-                        <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-black">
-                          <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                              Edificio
-                            </span>
-                            <select
-                              value={assignBuildingId}
-                              onChange={(e) => {
-                                setAssignBuildingId(e.target.value);
-                                setAssignUnitId("");
-                              }}
-                              className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
-                            >
-                              <option value="">Selecciona un edificio</option>
-                              {buildings.map((b) => (
-                                <option key={b.id} value={b.id}>
-                                  {b.name}
+                    )}
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider ${
+                        r.status === "verified"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                          : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                      }`}
+                    >
+                      {r.status === "verified" ? "Verificado" : "Pendiente"}
+                    </span>
+                  </div>
+                }
+              >
+                {units.length === 0 ? (
+                  <div className="flex flex-col gap-3">
+                    <p className="text-sm text-zinc-400">
+                      Sin unidades asignadas
+                    </p>
+                    {assigningForRole === r.id ? (
+                      <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-black">
+                        <label className="flex flex-col gap-1.5">
+                          <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                            Edificio
+                          </span>
+                          <select
+                            value={assignBuildingId}
+                            onChange={(e) => {
+                              setAssignBuildingId(e.target.value);
+                              setAssignUnitId("");
+                            }}
+                            className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
+                          >
+                            <option value="">Selecciona un edificio</option>
+                            {buildings.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="flex flex-col gap-1.5">
+                          <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                            Unidad
+                          </span>
+                          <select
+                            value={assignUnitId}
+                            onChange={(e) => setAssignUnitId(e.target.value)}
+                            disabled={!assignBuildingId}
+                            className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 disabled:opacity-50 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
+                          >
+                            <option value="">Selecciona una unidad</option>
+                            {allUnits
+                              .filter(
+                                (u) =>
+                                  u.building === assignBuildingId && !u.owner
+                              )
+                              .map((u) => (
+                                <option key={u.id} value={u.id}>
+                                  {u.num}
                                 </option>
                               ))}
-                            </select>
-                          </label>
-                          <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                              Unidad
-                            </span>
-                            <select
-                              value={assignUnitId}
-                              onChange={(e) => setAssignUnitId(e.target.value)}
-                              disabled={!assignBuildingId}
-                              className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 disabled:opacity-50 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
-                            >
-                              <option value="">Selecciona una unidad</option>
-                              {allUnits
-                                .filter(
-                                  (u) =>
-                                    u.building === assignBuildingId && !u.owner
-                                )
-                                .map((u) => (
-                                  <option key={u.id} value={u.id}>
-                                    {u.num}
-                                  </option>
-                                ))}
-                            </select>
-                          </label>
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={() => handleAssignUnit(r.user)}
-                              disabled={!assignUnitId || assigning}
-                              variant="primary"
-                              size="md"
-                            >
-                              {assigning ? "Asignando..." : "Asignar"}
-                            </Button>
-                            <Button
-                              onClick={() => {
-                                setAssigningForRole(null);
-                                setAssignBuildingId("");
-                                setAssignUnitId("");
-                              }}
-                              disabled={assigning}
-                              variant="secondary"
-                              size="md"
-                            >
-                              Cancelar
-                            </Button>
-                          </div>
+                          </select>
+                        </label>
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => handleAssignUnit(r.user)}
+                            disabled={!assignUnitId || assigning}
+                            variant="primary"
+                            size="md"
+                          >
+                            {assigning ? "Asignando..." : "Asignar"}
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              setAssigningForRole(null);
+                              setAssignBuildingId("");
+                              setAssignUnitId("");
+                            }}
+                            disabled={assigning}
+                            variant="secondary"
+                            size="md"
+                          >
+                            Cancelar
+                          </Button>
                         </div>
+                      </div>
+                    ) : (
+                      <Button
+                        onClick={() => setAssigningForRole(r.id)}
+                        variant="secondary"
+                        size="md"
+                      >
+                        Asignar unidad
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      {units.map((u) => {
+                        const building = buildingsMap[u.building];
+                        const canRemove =
+                          isAdminOrManager || r.user === appUser?.id;
+                        const isSelf = r.user === appUser?.id;
+                        return (
+                          <div
+                            key={u.id}
+                            className="flex items-center gap-3 rounded-lg bg-zinc-50 px-4 py-2.5 dark:bg-zinc-900"
+                          >
+                            <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                              {building?.name ?? "?"} / {u.num}
+                            </span>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+                                u.type === "residential"
+                                  ? "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400"
+                                  : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                              }`}
+                            >
+                              {u.type === "residential" ? "Hab." : "Ofi."}
+                            </span>
+                            <span
+                              className={`ml-auto text-[10px] font-medium ${
+                                u.owner_status === "verified"
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-amber-600 dark:text-amber-400"
+                              }`}
+                            >
+                              {u.owner_status === "verified"
+                                ? "Verificado"
+                                : "Pendiente"}
+                            </span>
+                            {canRemove && (
+                              <Button
+                                onClick={() =>
+                                  handleRemoveOwner(u.id, r.user, r.id)
+                                }
+                                disabled={removingUnitId === u.id || removing}
+                                variant="danger"
+                                size="xs"
+                              >
+                                {removingUnitId === u.id || removing
+                                  ? "..."
+                                  : isSelf
+                                    ? "Renunciar"
+                                    : "Revocar"}
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div>
+                      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                        Pagos pendientes
+                      </h4>
+                      {pendingEntries.length === 0 ? (
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                          No tiene pagos pendientes.
+                        </p>
                       ) : (
-                        <Button
-                          onClick={() => setAssigningForRole(r.id)}
-                          variant="secondary"
-                          size="md"
-                        >
-                          Asignar unidad
-                        </Button>
+                        <div className="flex flex-col gap-2">
+                          {pendingEntries.map((entry) => {
+                            const expense = expenses[entry.expense];
+                            const unit = units.find((u) => u.id === entry.unit);
+                            return (
+                              <PaymentOrderItem
+                                key={entry.id}
+                                entry={entry}
+                                expense={expense}
+                                unit={unit}
+                                building={
+                                  unit ? buildingsMap[unit.building] : undefined
+                                }
+                                showValidateForm
+                                onValidate={(note) =>
+                                  handleValidatePayment(entry.id, note)
+                                }
+                                isValidating={validatingPayment}
+                              />
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
-                  ) : (
-                    <div className="flex flex-col gap-4">
-                      <div className="flex flex-col gap-1.5">
-                        {units.map((u) => {
-                          const building = buildings.find(
-                            (b) => b.id === u.building
-                          );
-                          const canRemove =
-                            isAdminOrManager || r.user === appUser?.id;
-                          const isSelf = r.user === appUser?.id;
-                          return (
+
+                    <div>
+                      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                        Métodos de pago
+                      </h4>
+                      {paymentMethods.length === 0 ? (
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                          No hay métodos de pago configurados.
+                        </p>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          {paymentMethods.map((method) => (
                             <div
-                              key={u.id}
-                              className="flex items-center gap-3 rounded-lg bg-zinc-50 px-4 py-2.5 dark:bg-zinc-900"
+                              key={method.id}
+                              className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-black"
                             >
-                              <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                                {building?.name ?? "?"} / {u.num}
-                              </span>
-                              <span
-                                className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
-                                  u.type === "residential"
-                                    ? "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400"
-                                    : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                                }`}
-                              >
-                                {u.type === "residential" ? "Hab." : "Ofi."}
-                              </span>
-                              <span
-                                className={`ml-auto text-[10px] font-medium ${
-                                  u.owner_status === "verified"
-                                    ? "text-emerald-600 dark:text-emerald-400"
-                                    : "text-amber-600 dark:text-amber-400"
-                                }`}
-                              >
-                                {u.owner_status === "verified"
-                                  ? "Verificado"
-                                  : "Pendiente"}
-                              </span>
-                              {canRemove && (
-                                <Button
-                                  onClick={() =>
-                                    handleRemoveOwner(u.id, r.user, r.id)
-                                  }
-                                  disabled={removingUnitId === u.id}
-                                  variant="danger"
-                                  size="xs"
-                                >
-                                  {removingUnitId === u.id
-                                    ? "..."
-                                    : isSelf
-                                      ? "Renunciar"
-                                      : "Revocar"}
-                                </Button>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      <div>
-                        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                          Pagos pendientes
-                        </h4>
-                        {pendingEntries.length === 0 ? (
-                          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                            No tiene pagos pendientes.
-                          </p>
-                        ) : (
-                          <div className="flex flex-col gap-2">
-                            {pendingEntries.map((entry) => {
-                              const expense = expenses[entry.expense];
-                              const unit = units.find((u) => u.id === entry.unit);
-                              return (
-                                <PaymentOrderItem
-                                  key={entry.id}
-                                  entry={entry}
-                                  expense={expense}
-                                  unit={unit}
-                                  building={
-                                    unit
-                                      ? buildings.find((b) => b.id === unit.building)
-                                      : undefined
-                                  }
-                                  showValidateForm
-                                  onValidate={(note) =>
-                                    handleValidatePayment(entry.id, note)
-                                  }
-                                  isValidating={validatingPaymentId === entry.id}
-                                />
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-
-                      <div>
-                        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                          Métodos de pago
-                        </h4>
-                        {paymentMethods.length === 0 ? (
-                          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                            No hay métodos de pago configurados.
-                          </p>
-                        ) : (
-                          <div className="flex flex-col gap-2">
-                            {paymentMethods.map((method) => (
-                              <div
-                                key={method.id}
-                                className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-black"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                                    {method.name}
-                                  </p>
-                                  {method.is_default && (
-                                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                                      Predeterminado
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-zinc-500">
-                                  {TYPE_LABELS[method.type]}
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                                  {method.name}
                                 </p>
-                                <div className="mt-2 grid gap-0.5 text-xs text-zinc-700 dark:text-zinc-300">
-                                  {method.holder_name && (
-                                    <p>Titular: {method.holder_name}</p>
-                                  )}
-                                  {method.bank_name && (
-                                    <p>Banco: {method.bank_name}</p>
-                                  )}
-                                  {method.account_number && (
-                                    <p>Cuenta: {method.account_number}</p>
-                                  )}
-                                  {method.routing_number && (
-                                    <p>Routing: {method.routing_number}</p>
-                                  )}
-                                  {method.phone && <p>Teléfono: {method.phone}</p>}
-                                  {method.email && <p>Correo: {method.email}</p>}
-                                  {method.identification && (
-                                    <p>Documento: {method.identification}</p>
-                                  )}
-                                </div>
-                                {method.notes && (
-                                  <p className="mt-2 text-xs text-zinc-500">
-                                    {method.notes}
-                                  </p>
+                                {method.is_default && (
+                                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                    Predeterminado
+                                  </span>
                                 )}
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                              <p className="text-xs text-zinc-500">
+                                {TYPE_LABELS[method.type]}
+                              </p>
+                              <div className="mt-2 grid gap-0.5 text-xs text-zinc-700 dark:text-zinc-300">
+                                {method.holder_name && (
+                                  <p>Titular: {method.holder_name}</p>
+                                )}
+                                {method.bank_name && (
+                                  <p>Banco: {method.bank_name}</p>
+                                )}
+                                {method.account_number && (
+                                  <p>Cuenta: {method.account_number}</p>
+                                )}
+                                {method.routing_number && (
+                                  <p>Routing: {method.routing_number}</p>
+                                )}
+                                {method.phone && <p>Teléfono: {method.phone}</p>}
+                                {method.email && <p>Correo: {method.email}</p>}
+                                {method.identification && (
+                                  <p>Documento: {method.identification}</p>
+                                )}
+                              </div>
+                              {method.notes && (
+                                <p className="mt-2 text-xs text-zinc-500">
+                                  {method.notes}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </Collapse>
-              );
-            })}
+                  </div>
+                )}
+              </Collapse>
+            );
+          })}
         </div>
       </section>
     </div>

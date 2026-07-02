@@ -1,41 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
-import { updateUser } from "@/lib/services/userService";
+import { useUpdateUser } from "@/lib/mutations/useUserMutations";
 import { ProfileSkeleton } from "@/components/skeleton";
 
 export default function ProfilePage() {
   const { user, appUser } = useAuthContext();
-  const router = useRouter();
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [saving, setSaving] = useState(false);
+
+  const [name, setName] = useState(appUser?.name ?? "");
+  const [phone, setPhone] = useState(appUser?.phone ?? "");
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    if (appUser) {
-      setName(appUser.name);
-      setPhone(appUser.phone ?? "");
-    }
-  }, [appUser]);
+  const { mutate: updateUser, isPending: saving } = useUpdateUser();
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!appUser) return;
-    setSaving(true);
-    try {
-      await updateUser(appUser.id, { name: name.trim(), phone: phone.trim() });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch {
-      alert("Error al guardar");
-    } finally {
-      setSaving(false);
-    }
+
+    updateUser(
+      {
+        id: appUser.id,
+        data: { name: name.trim(), phone: phone.trim() },
+      },
+      {
+        onSuccess: () => {
+          setSaved(true);
+          setTimeout(() => setSaved(false), 2000);
+        },
+        onError: () => alert("Error al guardar"),
+      }
+    );
   };
 
   if (!appUser) {
@@ -45,7 +42,10 @@ export default function ProfilePage() {
   return (
     <div className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-8 px-4 py-8">
       <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-        <Link href="/home" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+        <Link
+          href="/home"
+          className="hover:text-zinc-700 dark:hover:text-zinc-200"
+        >
           Inicio
         </Link>
         <span>/</span>
@@ -103,12 +103,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button
-            type="submit"
-            disabled={saving}
-            variant="primary"
-            size="lg"
-          >
+          <Button type="submit" disabled={saving} variant="primary" size="lg">
             {saving ? "Guardando..." : "Guardar cambios"}
           </Button>
           {saved && (

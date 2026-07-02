@@ -1,71 +1,31 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
 import { useBuilding } from "@/lib/queries/useBuilding";
 import { useDuplicateBuilding } from "@/lib/mutations/useBuildingMutations";
+import { Building } from "@/lib/types";
 import { FormSkeleton } from "@/components/skeleton";
 
-export default function DuplicateBuilding() {
-  const { appUser } = useAuthContext();
-  const params = useParams();
+function DuplicateBuildingForm({
+  sourceBuilding,
+  condominiumId,
+}: {
+  sourceBuilding: Building;
+  condominiumId: string;
+}) {
   const router = useRouter();
-  const buildingId = params.buildingId as string;
-  const condominiumId = params.id as string;
+  const buildingId = sourceBuilding.id;
 
-  const { data: building, isLoading } = useBuilding(buildingId);
-
-  const [name, setName] = useState("");
-  const [symbol, setSymbol] = useState("");
-  const [address, setAddress] = useState("");
+  const [name, setName] = useState(`${sourceBuilding.name} (copia)`);
+  const [symbol, setSymbol] = useState(sourceBuilding.symbol);
+  const [address, setAddress] = useState(sourceBuilding.address ?? "");
   const [error, setError] = useState("");
 
   const { mutate: duplicateBuilding, isPending: submitting } =
     useDuplicateBuilding();
-
-  const canEdit =
-    appUser?.role === "admin" || appUser?.role === "administrator";
-
-  useEffect(() => {
-    if (building) {
-      setName(`${building.name} (copia)`);
-      setSymbol(building.symbol);
-      setAddress(building.address ?? "");
-    }
-  }, [building]);
-
-  useEffect(() => {
-    if (!isLoading && building === null) {
-      router.replace(`/condominium/${condominiumId}`);
-    }
-  }, [isLoading, building, router, condominiumId]);
-
-  if (!canEdit) {
-    return (
-      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
-        <div className="flex flex-col items-center gap-6 rounded-xl border border-zinc-200 bg-white px-8 py-20 text-center dark:border-zinc-800 dark:bg-black">
-          <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Sin permisos
-          </h1>
-          <p className="max-w-sm text-zinc-500 dark:text-zinc-400">
-            Solo los administradores pueden duplicar edificios.
-          </p>
-          <Link
-            href={`/condominium/${condominiumId}`}
-            className="h-10 rounded-full border border-zinc-200 px-6 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
-          >
-            Volver
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return <FormSkeleton titleWidth="w-48" inputCount={3} />;
-  }
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -92,6 +52,125 @@ export default function DuplicateBuilding() {
       }
     );
   };
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-6">
+      <div className="grid gap-6 sm:grid-cols-2">
+        <div>
+          <label
+            htmlFor="name"
+            className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+          >
+            Nombre del edificio
+          </label>
+          <input
+            id="name"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-4 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder-zinc-500 dark:focus:border-zinc-400"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="symbol"
+            className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+          >
+            Símbolo
+          </label>
+          <input
+            id="symbol"
+            type="text"
+            value={symbol}
+            onChange={(e) => setSymbol(e.target.value)}
+            required
+            className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-4 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder-zinc-500 dark:focus:border-zinc-400"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label
+          htmlFor="address"
+          className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+        >
+          Dirección (opcional)
+        </label>
+        <input
+          id="address"
+          type="text"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-4 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder-zinc-500 dark:focus:border-zinc-400"
+        />
+      </div>
+
+      {error && (
+        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+      )}
+
+      <div className="flex gap-3">
+        <button
+          type="submit"
+          disabled={submitting || !name.trim() || !symbol.trim()}
+          className="h-11 rounded-full bg-zinc-900 px-8 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+        >
+          {submitting ? "Duplicando..." : "Duplicar edificio"}
+        </button>
+        <Link
+          href={`/condominium/${condominiumId}/buildings/${buildingId}`}
+          className="flex h-11 items-center rounded-full border border-zinc-200 px-6 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+        >
+          Cancelar
+        </Link>
+      </div>
+    </form>
+  );
+}
+
+export default function DuplicateBuilding() {
+  const { appUser } = useAuthContext();
+  const params = useParams();
+  const router = useRouter();
+  const buildingId = params.buildingId as string;
+  const condominiumId = params.id as string;
+
+  const { data: building, isLoading } = useBuilding(buildingId);
+
+  const canEdit =
+    appUser?.role === "admin" || appUser?.role === "administrator";
+
+  if (!canEdit) {
+    return (
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
+        <div className="flex flex-col items-center gap-6 rounded-xl border border-zinc-200 bg-white px-8 py-20 text-center dark:border-zinc-800 dark:bg-black">
+          <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Sin permisos
+          </h1>
+          <p className="max-w-sm text-zinc-500 dark:text-zinc-400">
+            Solo los administradores pueden duplicar edificios.
+          </p>
+          <Link
+            href={`/condominium/${condominiumId}`}
+            className="h-10 rounded-full border border-zinc-200 px-6 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          >
+            Volver
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return <FormSkeleton titleWidth="w-48" inputCount={3} />;
+  }
+
+  if (!building) {
+    router.replace(`/condominium/${condominiumId}`);
+    return null;
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
@@ -128,79 +207,10 @@ export default function DuplicateBuilding() {
           Se copiarán todas las unidades del edificio original.
         </p>
 
-        <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-6">
-          <div className="grid gap-6 sm:grid-cols-2">
-            <div>
-              <label
-                htmlFor="name"
-                className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-              >
-                Nombre del edificio
-              </label>
-              <input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-4 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder-zinc-500 dark:focus:border-zinc-400"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="symbol"
-                className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-              >
-                Símbolo
-              </label>
-              <input
-                id="symbol"
-                type="text"
-                value={symbol}
-                onChange={(e) => setSymbol(e.target.value)}
-                required
-                className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-4 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder-zinc-500 dark:focus:border-zinc-400"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="address"
-              className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-            >
-              Dirección (opcional)
-            </label>
-            <input
-              id="address"
-              type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              className="h-11 w-full rounded-lg border border-zinc-300 bg-white px-4 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder-zinc-500 dark:focus:border-zinc-400"
-            />
-          </div>
-
-          {error && (
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-          )}
-
-          <div className="flex gap-3">
-            <button
-              type="submit"
-              disabled={submitting || !name.trim() || !symbol.trim()}
-              className="h-11 rounded-full bg-zinc-900 px-8 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
-            >
-              {submitting ? "Duplicando..." : "Duplicar edificio"}
-            </button>
-            <Link
-              href={`/condominium/${condominiumId}/buildings/${buildingId}`}
-              className="flex h-11 items-center rounded-full border border-zinc-200 px-6 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
-            >
-              Cancelar
-            </Link>
-          </div>
-        </form>
+        <DuplicateBuildingForm
+          sourceBuilding={building}
+          condominiumId={condominiumId}
+        />
       </div>
     </div>
   );

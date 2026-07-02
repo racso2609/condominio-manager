@@ -18,6 +18,7 @@ function InviteContent() {
     token ? "" : "Token de invitación no encontrado"
   );
   const [done, setDone] = useState(false);
+  const [now] = useState(() => Date.now());
 
   const { data: role, isLoading: roleLoading } = useInviteByToken(
     token ?? undefined
@@ -33,7 +34,7 @@ function InviteContent() {
   const isInvalid =
     !token ||
     (!roleLoading && !role) ||
-    (role?.expires_at && role.expires_at.toMillis() < Date.now()) ||
+    (role?.expires_at && role.expires_at.toMillis() < now) ||
     (role?.invited_email && role.user);
 
   if (loading) {
@@ -43,7 +44,7 @@ function InviteContent() {
   if (error || isInvalid) {
     const message = error || role?.invited_email && role.user
       ? "Invitación ya fue aceptada"
-      : role?.expires_at && role.expires_at.toMillis() < Date.now()
+      : role?.expires_at && role.expires_at.toMillis() < now
         ? "Invitación expirada"
         : "Invitación no válida o ya fue utilizada";
 

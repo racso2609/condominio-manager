@@ -16,7 +16,6 @@ import {
   useVerifyUnitOwner,
   useRejectUnitClaim,
 } from "@/lib/mutations/useUnitMutations";
-import { Unit } from "@/lib/types";
 import { BuildingDetailSkeleton } from "@/components/skeleton";
 
 export default function BuildingDetail() {
