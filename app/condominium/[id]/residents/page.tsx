@@ -320,6 +320,32 @@ export default function ResidentsPage() {
     return getPendingEntriesForOwner(ownerId).reduce((s, e) => s + e.amount, 0);
   };
 
+  const residentRoles = Object.values(
+    roles
+      .filter(
+        (r) =>
+          r.role === "resident" ||
+          (r.role === "administrator" && unitsByOwner[r.user]?.length > 0)
+      )
+      .reduce<Record<string, CondominiumRole>>((acc, r) => {
+        const existing = acc[r.user];
+        if (!existing) {
+          acc[r.user] = r;
+          return acc;
+        }
+        const existingScore =
+          (existing.status === "verified" ? 2 : 0) +
+          (existing.role === "administrator" ? 1 : 0);
+        const newScore =
+          (r.status === "verified" ? 2 : 0) +
+          (r.role === "administrator" ? 1 : 0);
+        if (newScore > existingScore) {
+          acc[r.user] = r;
+        }
+        return acc;
+      }, {})
+  );
+
   if (loading) {
     return (
       <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
@@ -448,22 +474,10 @@ export default function ResidentsPage() {
 
       <section>
         <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Residentes y propietarios ({
-            roles.filter(
-              (r) =>
-                r.role === "resident" ||
-                (r.role === "administrator" && unitsByOwner[r.user]?.length > 0)
-            ).length
-          })
+          Residentes y propietarios ({residentRoles.length})
         </h2>
         <div className="flex flex-col gap-2">
-          {roles
-            .filter(
-              (r) =>
-                r.role === "resident" ||
-                (r.role === "administrator" && unitsByOwner[r.user]?.length > 0)
-            )
-            .map((r) => {
+          {residentRoles.map((r) => {
               const owner = owners[r.user] ?? null;
               const units = unitsByOwner[r.user] ?? [];
               const pendingEntries = getPendingEntriesForOwner(r.user);

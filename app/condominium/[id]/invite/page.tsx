@@ -66,8 +66,8 @@ export default function InviteResidentPage() {
       setRoles((prev) => [...prev, role]);
       setLastLink(`${BASE_URL}/invite?token=${role.token}`);
       setEmail("");
-    } catch {
-      alert("Error al enviar invitación");
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Error al enviar invitación");
     } finally {
       setSending(false);
     }

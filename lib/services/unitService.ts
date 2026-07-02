@@ -12,7 +12,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "@/firebase";
-import { Unit } from "@/lib/types";
+import { Building, Unit } from "@/lib/types";
 
 const COLLECTION = "units";
 
@@ -121,6 +121,22 @@ export async function claimUnit(unitId: string, userId: string): Promise<void> {
       `Esta unidad fue reclamada recientemente. Intenta de nuevo en ${days} día(s).`
     );
   }
+
+  const buildingSnap = await getDoc(doc(db, "buildings", unit.building));
+  if (!buildingSnap.exists()) throw new Error("Edificio no encontrado");
+  const building = buildingSnap.data() as Building;
+
+  const roleSnapshot = await getDocs(
+    query(
+      collection(db, "condominium_roles"),
+      where("condominium", "==", building.condominium),
+      where("user", "==", userId),
+    )
+  );
+  if (roleSnapshot.empty) {
+    throw new Error("Debes ser parte del condominio para reclamar una unidad");
+  }
+
   await updateDoc(doc(db, COLLECTION, unitId), {
     owner: userId,
     owner_status: "pending",

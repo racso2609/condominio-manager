@@ -135,8 +135,8 @@ export default function BuildingDetail() {
       );
       const owner = await getUser(appUser.id);
       if (owner) setOwners((prev) => ({ ...prev, [appUser.id]: owner }));
-    } catch {
-      alert("Error al reclamar unidad");
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Error al reclamar unidad");
     } finally {
       setClaiming(null);
     }
