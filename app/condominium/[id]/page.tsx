@@ -227,6 +227,13 @@ export default function CondominiumDetail() {
         >
           Mis pagos
         </Button>
+        <Button
+          href={`/condominium/${condominium.id}/complaints`}
+          variant="secondary"
+          size="md"
+        >
+          Quejas
+        </Button>
       </div>
 
       {buildings.length === 0 ? (

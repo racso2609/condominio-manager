@@ -134,3 +134,26 @@ export interface PaymentMethod {
   created_at: Timestamp;
   updated_at: Timestamp;
 }
+
+export type ComplaintStatus = "pending" | "in_progress" | "resolved";
+
+export interface ComplaintFile {
+  name: string;
+  url: string;
+  type: "image" | "document";
+}
+
+export interface Complaint {
+  id: string;
+  condominium: string;
+  title: string;
+  content: string;
+  files?: ComplaintFile[];
+  author: string;
+  status: ComplaintStatus;
+  resolution_notes?: string | null;
+  resolved_by?: string | null;
+  resolved_at?: Timestamp | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}

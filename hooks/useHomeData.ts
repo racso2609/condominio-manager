@@ -7,6 +7,7 @@ import {
   getCondominium,
 } from "@/lib/services/condominiumService";
 import { getAnnouncementsByCondominium } from "@/lib/services/announcementService";
+import { getComplaintsByCondominium } from "@/lib/services/complaintService";
 import { getUser } from "@/lib/services/userService";
 import { getUnitsByOwner } from "@/lib/services/unitService";
 import { getBuilding } from "@/lib/services/buildingService";
@@ -24,6 +25,7 @@ import {
   Unit,
   Building,
   Expense,
+  Complaint,
 } from "@/lib/types";
 
 interface UseHomeDataResult {
@@ -31,6 +33,8 @@ interface UseHomeDataResult {
   pendingInvites: CondominiumRole[];
   announcements: Announcement[];
   announcementAuthors: Record<string, AppUser>;
+  complaints: Complaint[];
+  complaintAuthors: Record<string, AppUser>;
   condominiumNames: Record<string, string>;
   paymentEntries: ExpenseEntry[];
   paymentUnits: Record<string, Unit>;
@@ -44,6 +48,10 @@ export function useHomeData(appUser: AppUser | undefined): UseHomeDataResult {
   const [pendingInvites, setPendingInvites] = useState<CondominiumRole[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [announcementAuthors, setAnnouncementAuthors] = useState<
+    Record<string, AppUser>
+  >({});
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [complaintAuthors, setComplaintAuthors] = useState<
     Record<string, AppUser>
   >({});
   const [condominiumNames, setCondominiumNames] = useState<
@@ -71,7 +79,7 @@ export function useHomeData(appUser: AppUser | undefined): UseHomeDataResult {
 
       const condoIds = list.map((c) => c.id);
 
-      const [allAnnouncements, userUnits] = await Promise.all([
+      const [allAnnouncements, allComplaints, userUnits] = await Promise.all([
         (async () => {
           const anns: Announcement[] = [];
           for (const c of list) {
@@ -83,15 +91,35 @@ export function useHomeData(appUser: AppUser | undefined): UseHomeDataResult {
           );
           return anns;
         })(),
+        (async () => {
+          const comps: Complaint[] = [];
+          for (const c of list) {
+            const condoComps = await getComplaintsByCondominium(c.id);
+            comps.push(...condoComps);
+          }
+          return comps;
+        })(),
         getUnitsByOwner(appUser.id),
       ]);
       setAnnouncements(allAnnouncements);
+
+      const visibleComplaints =
+        appUser.role === "admin"
+          ? allComplaints
+          : allComplaints.filter((c) => c.author === appUser.id);
+      visibleComplaints.sort(
+        (a, b) => b.created_at.toMillis() - a.created_at.toMillis()
+      );
+      setComplaints(visibleComplaints);
 
       const authorIds = new Set<string>();
       const announcementCondoIds = new Set<string>();
       allAnnouncements.forEach((a) => {
         authorIds.add(a.author);
         announcementCondoIds.add(a.condominium);
+      });
+      visibleComplaints.forEach((c) => {
+        authorIds.add(c.author);
       });
 
       const buildingIds = new Set(userUnits.map((u) => u.building));
@@ -152,6 +180,7 @@ export function useHomeData(appUser: AppUser | undefined): UseHomeDataResult {
         if (u) map[uid] = u;
       }
       setAnnouncementAuthors(map);
+      setComplaintAuthors(map);
       setLoading(false);
     });
   }, [appUser]);
@@ -161,6 +190,8 @@ export function useHomeData(appUser: AppUser | undefined): UseHomeDataResult {
     pendingInvites,
     announcements,
     announcementAuthors,
+    complaints,
+    complaintAuthors,
     condominiumNames,
     paymentEntries,
     paymentUnits,

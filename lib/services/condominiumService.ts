@@ -88,6 +88,21 @@ export async function getCondominiumRoles(condominiumId: string): Promise<Condom
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as CondominiumRole));
 }
 
+export async function getUserCondominiumRole(
+  userId: string,
+  condominiumId: string,
+): Promise<CondominiumRole | null> {
+  const snapshot = await getDocs(
+    query(
+      collection(db, ROLE_COLLECTION),
+      where("condominium", "==", condominiumId),
+      where("user", "==", userId),
+    )
+  );
+  if (snapshot.empty) return null;
+  return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as CondominiumRole;
+}
+
 function generateToken(): string {
   return crypto.randomUUID();
 }

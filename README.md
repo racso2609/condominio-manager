@@ -1,6 +1,6 @@
 # Condominio Gestión
 
-Aplicación web para la gestión de condominios. Permite administrar edificios, unidades, residentes, gastos comunes, pagos, anuncios y métodos de pago.
+Aplicación web para la gestión de condominios. Permite administrar edificios, unidades, residentes, gastos comunes, pagos, anuncios, quejas y métodos de pago.
 
 ## Características
 
@@ -11,6 +11,7 @@ Aplicación web para la gestión de condominios. Permite administrar edificios, 
 - **Gastos comunes**: creación de gastos, generación de órdenes de pago por unidad.
 - **Pagos**: reporte de pagos por residentes, validación por administradores, métodos de pago.
 - **Anuncios**: publicación de anuncios con imágenes y documentos.
+- **Quejas**: registro de quejas por residentes con imágenes y documentos; administradores pueden gestionar estados (pendiente, en progreso, resuelta).
 - **Dashboard de residentes**: visualización de deudas pendientes y pagos realizados.
 
 ## Tecnologías

@@ -8,6 +8,7 @@ import {
   InvitesSection,
   PaymentsSection,
   AnnouncementsSection,
+  ComplaintsSection,
   CondominiumsSection,
 } from "@/components/home";
 
@@ -18,6 +19,8 @@ export default function Home() {
     pendingInvites,
     announcements,
     announcementAuthors,
+    complaints,
+    complaintAuthors,
     condominiumNames,
     paymentEntries,
     paymentUnits,
@@ -43,6 +46,12 @@ export default function Home() {
       <AnnouncementsSection
         announcements={announcements}
         announcementAuthors={announcementAuthors}
+      />
+
+      <ComplaintsSection
+        complaints={complaints}
+        complaintAuthors={complaintAuthors}
+        condominiumNames={condominiumNames}
       />
 
       <CondominiumsSection
