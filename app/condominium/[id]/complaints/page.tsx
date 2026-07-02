@@ -55,7 +55,7 @@ export default function ComplaintsPage() {
   const canManage = isGlobalAdmin || isCondoAdmin;
   const canCreate =
     isGlobalAdmin ||
-    (userRole?.role === "resident" && userRole?.status === "verified");
+    (userRole?.role === "resident" && !!userRole?.user);
 
   useEffect(() => {
     if (!params.id || !appUser) return;

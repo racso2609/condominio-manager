@@ -38,7 +38,7 @@ export default function NewComplaintPage() {
   const isGlobalAdmin = appUser?.role === "admin";
   const canCreate =
     isGlobalAdmin ||
-    (userRole?.role === "resident" && userRole?.status === "verified");
+    (userRole?.role === "resident" && !!userRole?.user);
 
   useEffect(() => {
     if (!params.id || !appUser) return;
