@@ -23,11 +23,26 @@ export default function InviteResidentPage() {
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [lastLink, setLastLink] = useState("");
-  const [globalLink, setGlobalLink] = useState("");
   const [generatingGlobal, setGeneratingGlobal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [now, setNow] = useState(() => Date.now());
   const isAdminOrManager =
     appUser?.role === "admin" || appUser?.role === "administrator";
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const isExpired = (role: CondominiumRole) =>
+    !!role.expires_at && role.expires_at.toMillis() < now;
+
+  const globalInvite = roles.find(
+    (r) => !r.invited_email && r.token && !isExpired(r)
+  );
+  const globalLink = globalInvite
+    ? `${BASE_URL}/invite?token=${globalInvite.token}`
+    : "";
 
   useEffect(() => {
     if (!params.id) return;
@@ -63,8 +78,6 @@ export default function InviteResidentPage() {
     setGeneratingGlobal(true);
     try {
       const role = await createGlobalInvite(condominium.id, appUser.id);
-      const link = `${BASE_URL}/invite?token=${role.token}`;
-      setGlobalLink(link);
       setRoles((prev) => [...prev, role]);
     } catch {
       alert("Error al generar el link de invitación");
@@ -215,12 +228,14 @@ export default function InviteResidentPage() {
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
                     {r.user
                       ? "Aceptada"
-                      : r.expires_at
-                        ? `Pendiente — expira ${r.expires_at.toDate().toLocaleDateString()}`
-                        : "Pendiente"}
+                      : isExpired(r)
+                        ? "Expirada"
+                        : r.expires_at
+                          ? `Pendiente — expira ${r.expires_at.toDate().toLocaleDateString()}`
+                          : "Pendiente"}
                   </p>
                 </div>
-                {!r.user && r.token && (
+                {r.token && !isExpired(r) && (!r.user || !r.invited_email) && (
                   <button
                     onClick={() => copyFromRole(r)}
                     className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"

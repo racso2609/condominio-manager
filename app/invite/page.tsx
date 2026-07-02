@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useAuthContext } from "@/context/authContext";
 import { Button } from "@/components/Button";
 import { getInviteByToken, acceptInvite } from "@/lib/services/condominiumService";
@@ -11,23 +11,22 @@ import { CondominiumRole, Condominium } from "@/lib/types";
 function InviteContent() {
   const { user, appUser, login, loading: authLoading } = useAuthContext();
   const searchParams = useSearchParams();
-  const router = useRouter();
   const token = searchParams.get("token");
 
   const [role, setRole] = useState<CondominiumRole | null>(null);
   const [condominium, setCondominium] = useState<Condominium | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    token ? "" : "Token de invitación no encontrado"
+  );
   const [accepting, setAccepting] = useState(false);
   const [done, setDone] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!token);
 
   useEffect(() => {
-    if (!token) {
-      setError("Token de invitación no encontrado");
-      setLoading(false);
-      return;
-    }
+    if (!token) return;
+    let cancelled = false;
     getInviteByToken(token).then(async (r) => {
+      if (cancelled) return;
       if (!r) {
         setError("Invitación no válida o ya fue utilizada");
         setLoading(false);
@@ -38,16 +37,20 @@ function InviteContent() {
         setLoading(false);
         return;
       }
-      if (r.user) {
+      if (r.invited_email && r.user) {
         setError("Invitación ya fue aceptada");
         setLoading(false);
         return;
       }
       setRole(r);
       const condo = await getCondominium(r.condominium);
+      if (cancelled) return;
       setCondominium(condo);
       setLoading(false);
     });
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   const handleAccept = async () => {

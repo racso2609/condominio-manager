@@ -112,6 +112,18 @@ export async function createInvite(
   invitedBy: string,
   email: string,
 ): Promise<CondominiumRole> {
+  const existingSnapshot = await getDocs(
+    query(
+      collection(db, ROLE_COLLECTION),
+      where("condominium", "==", condominiumId),
+      where("invited_email", "==", email),
+      where("user", "==", ""),
+    )
+  );
+  if (!existingSnapshot.empty) {
+    throw new Error("Ya existe una invitación pendiente para este correo");
+  }
+
   const now = Timestamp.now();
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);
@@ -169,12 +181,51 @@ export async function acceptInvite(token: string, userId: string): Promise<Condo
   if (!role) throw new Error("Invitación no encontrada");
   if (role.expires_at && role.expires_at.toMillis() < Date.now())
     throw new Error("Invitación expirada");
-  if (role.user)
-    throw new Error("Invitación ya fue aceptada");
 
-  const ref = doc(db, ROLE_COLLECTION, role.id);
-  await updateDoc(ref, { user: userId, updated_at: Timestamp.now() });
-  return { ...role, user: userId, updated_at: Timestamp.now() };
+  if (role.invited_email) {
+    if (role.user) throw new Error("Invitación ya fue aceptada");
+
+    const existingSnapshot = await getDocs(
+      query(
+        collection(db, ROLE_COLLECTION),
+        where("condominium", "==", role.condominium),
+        where("user", "==", userId),
+      )
+    );
+    if (!existingSnapshot.empty) {
+      throw new Error("Ya eres parte de este condominio");
+    }
+
+    const ref = doc(db, ROLE_COLLECTION, role.id);
+    await updateDoc(ref, { user: userId, updated_at: Timestamp.now() });
+    return { ...role, user: userId, updated_at: Timestamp.now() };
+  }
+
+  // Global invite: create a new role for this user without consuming the token.
+  const existingSnapshot = await getDocs(
+    query(
+      collection(db, ROLE_COLLECTION),
+      where("condominium", "==", role.condominium),
+      where("user", "==", userId),
+    )
+  );
+  if (!existingSnapshot.empty) {
+    throw new Error("Ya eres parte de este condominio");
+  }
+
+  const now = Timestamp.now();
+  const newRef = doc(collection(db, ROLE_COLLECTION));
+  const newRoleData = {
+    condominium: role.condominium,
+    user: userId,
+    role: "resident" as const,
+    status: "pending" as const,
+    invited_by: role.invited_by,
+    created_at: now,
+    updated_at: now,
+  };
+  await setDoc(newRef, newRoleData);
+  return { id: newRef.id, ...newRoleData };
 }
 
 export async function getPendingInvitesByEmail(email: string): Promise<CondominiumRole[]> {
