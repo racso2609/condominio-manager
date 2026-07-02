@@ -15,12 +15,15 @@ import {
   deleteComplaint,
 } from "@/lib/services/complaintService";
 import { getUser } from "@/lib/services/userService";
+import { getBuildingsByCondominium } from "@/lib/services/buildingService";
+import { getUnitsByOwner } from "@/lib/services/unitService";
 import {
   Complaint,
   Condominium,
   CondominiumRole,
   AppUser,
   ComplaintStatus,
+  Unit,
 } from "@/lib/types";
 
 const STATUS_LABELS: Record<ComplaintStatus, string> = {
@@ -38,6 +41,12 @@ const STATUS_COLORS: Record<ComplaintStatus, string> = {
     "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
 };
 
+function formatUnits(units: Unit[]): string {
+  if (units.length === 0) return "";
+  const nums = units.map((u) => u.num).sort();
+  return nums.length === 1 ? `Apto ${nums[0]}` : `Aptos ${nums.join(", ")}`;
+}
+
 export default function ComplaintsPage() {
   const { appUser } = useAuthContext();
   const params = useParams();
@@ -46,6 +55,7 @@ export default function ComplaintsPage() {
   const [userRole, setUserRole] = useState<CondominiumRole | null>(null);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [authors, setAuthors] = useState<Record<string, AppUser>>({});
+  const [authorUnits, setAuthorUnits] = useState<Record<string, Unit[]>>({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [resolutionNotes, setResolutionNotes] = useState<Record<string, string>>({});
@@ -62,9 +72,10 @@ export default function ComplaintsPage() {
     const id = params.id as string;
 
     const load = async () => {
-      const [condo, role] = await Promise.all([
+      const [condo, role, buildings] = await Promise.all([
         getCondominium(id),
         getUserCondominiumRole(appUser.id, id),
+        getBuildingsByCondominium(id),
       ]);
 
       if (!condo) {
@@ -86,11 +97,19 @@ export default function ComplaintsPage() {
 
       const ids = new Set(data.map((c) => c.author));
       const map: Record<string, AppUser> = {};
+      const unitMap: Record<string, Unit[]> = {};
+      const buildingIds = new Set(buildings.map((b) => b.id));
+
       for (const uid of ids) {
         const u = await getUser(uid);
         if (u) map[uid] = u;
+
+        const units = await getUnitsByOwner(uid);
+        const inCondo = units.filter((unit) => buildingIds.has(unit.building));
+        if (inCondo.length > 0) unitMap[uid] = inCondo;
       }
       setAuthors(map);
+      setAuthorUnits(unitMap);
 
       setLoading(false);
     };
@@ -195,6 +214,8 @@ export default function ComplaintsPage() {
         <section className="flex flex-col gap-4">
           {complaints.map((complaint) => {
             const author = authors[complaint.author];
+            const units = authorUnits[complaint.author];
+            const unitsText = units ? formatUnits(units) : "";
             const images =
               complaint.files?.filter((f) => f.type === "image") ?? [];
             const docs =
@@ -219,8 +240,13 @@ export default function ComplaintsPage() {
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-zinc-500">
-                      {author?.name ?? "Desconocido"} ·{" "}
-                      {complaint.created_at.toDate().toLocaleDateString()}
+                      {[
+                        author?.name ?? "Desconocido",
+                        unitsText,
+                        complaint.created_at.toDate().toLocaleDateString(),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </p>
                   </div>
                   {canManage && (
