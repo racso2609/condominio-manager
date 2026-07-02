@@ -1,87 +1,56 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuthContext } from "@/context/authContext";
 import { Button } from "@/components/Button";
 import { AppInviteSkeleton } from "@/components/skeleton";
-import { getInviteByToken, acceptInvite } from "@/lib/services/condominiumService";
-import { getCondominium } from "@/lib/services/condominiumService";
-import { CondominiumRole, Condominium } from "@/lib/types";
+import { useInviteByToken } from "@/lib/queries/useCondominium";
+import { useCondominium } from "@/lib/queries/useCondominium";
+import { useAcceptInvite } from "@/lib/mutations/useCondominiumMutations";
 
 function InviteContent() {
   const { user, appUser, login, loading: authLoading } = useAuthContext();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
 
-  const [role, setRole] = useState<CondominiumRole | null>(null);
-  const [condominium, setCondominium] = useState<Condominium | null>(null);
   const [error, setError] = useState(
     token ? "" : "Token de invitación no encontrado"
   );
-  const [accepting, setAccepting] = useState(false);
   const [done, setDone] = useState(false);
-  const [loading, setLoading] = useState(!!token);
 
-  useEffect(() => {
-    if (!token) return;
-    let cancelled = false;
-    getInviteByToken(token).then(async (r) => {
-      if (cancelled) return;
-      if (!r) {
-        setError("Invitación no válida o ya fue utilizada");
-        setLoading(false);
-        return;
-      }
-      if (r.expires_at && r.expires_at.toMillis() < Date.now()) {
-        setError("Invitación expirada");
-        setLoading(false);
-        return;
-      }
-      if (r.invited_email && r.user) {
-        setError("Invitación ya fue aceptada");
-        setLoading(false);
-        return;
-      }
-      setRole(r);
-      const condo = await getCondominium(r.condominium);
-      if (cancelled) return;
-      setCondominium(condo);
-      setLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [token]);
+  const { data: role, isLoading: roleLoading } = useInviteByToken(
+    token ?? undefined
+  );
+  const { data: condominium, isLoading: condoLoading } = useCondominium(
+    role?.condominium
+  );
 
-  const handleAccept = async () => {
-    if (!token || !appUser) return;
-    if (role?.invited_email && role.invited_email !== appUser.email) {
-      setError(
-        `Esta invitación fue enviada a ${role.invited_email}. Inicia sesión con esa cuenta.`
-      );
-      return;
-    }
-    setAccepting(true);
-    try {
-      await acceptInvite(token, appUser.id);
-      setDone(true);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Error al aceptar invitación");
-    } finally {
-      setAccepting(false);
-    }
-  };
+  const { mutate: acceptInvite, isPending: accepting } = useAcceptInvite();
 
-  if (loading || authLoading) {
+  const loading = roleLoading || condoLoading || authLoading;
+
+  const isInvalid =
+    !token ||
+    (!roleLoading && !role) ||
+    (role?.expires_at && role.expires_at.toMillis() < Date.now()) ||
+    (role?.invited_email && role.user);
+
+  if (loading) {
     return <AppInviteSkeleton />;
   }
 
-  if (error) {
+  if (error || isInvalid) {
+    const message = error || role?.invited_email && role.user
+      ? "Invitación ya fue aceptada"
+      : role?.expires_at && role.expires_at.toMillis() < Date.now()
+        ? "Invitación expirada"
+        : "Invitación no válida o ya fue utilizada";
+
     return (
       <div className="mx-auto flex max-w-lg flex-1 flex-col items-center justify-center gap-6 px-4 text-center">
         <div className="rounded-xl border border-red-200 bg-red-50 px-6 py-4 dark:border-red-900 dark:bg-red-900/20">
-          <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+          <p className="text-sm text-red-700 dark:text-red-400">{message}</p>
         </div>
         <Button href="/" variant="primary" size="lg">
           Ir al inicio
@@ -89,6 +58,25 @@ function InviteContent() {
       </div>
     );
   }
+
+  const handleAccept = () => {
+    if (!token || !appUser) return;
+    if (role?.invited_email && role.invited_email !== appUser.email) {
+      setError(
+        `Esta invitación fue enviada a ${role.invited_email}. Inicia sesión con esa cuenta.`
+      );
+      return;
+    }
+
+    acceptInvite(
+      { token, userId: appUser.id },
+      {
+        onSuccess: () => setDone(true),
+        onError: (e) =>
+          setError(e instanceof Error ? e.message : "Error al aceptar invitación"),
+      }
+    );
+  };
 
   if (done) {
     return (
@@ -98,8 +86,8 @@ function InviteContent() {
             ¡Invitación aceptada!
           </p>
           <p className="mt-1 text-sm text-emerald-600 dark:text-emerald-300">
-            Ya eres parte de {condominium?.name ?? "el condominio"}.
-            Ahora puedes reclamar una unidad.
+            Ya eres parte de {condominium?.name ?? "el condominio"}. Ahora puedes
+            reclamar una unidad.
           </p>
         </div>
         <Button
@@ -120,7 +108,8 @@ function InviteContent() {
           Invitación a condominio
         </h1>
         <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-          Has sido invitado a <strong>{condominium?.name ?? "un condominio"}</strong>
+          Has sido invitado a{" "}
+          <strong>{condominium?.name ?? "un condominio"}</strong>
           {role?.invited_email && (
             <> como residente ({role.invited_email})</>
           )}
@@ -143,8 +132,8 @@ function InviteContent() {
           <div className="mt-6">
             {role?.invited_email && role.invited_email !== appUser?.email ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900 dark:bg-amber-900/20 dark:text-amber-400">
-                Esta invitación fue enviada a {role.invited_email}.
-                Cierra sesión y entra con esa cuenta.
+                Esta invitación fue enviada a {role.invited_email}. Cierra sesión
+                y entra con esa cuenta.
               </div>
             ) : (
               <Button

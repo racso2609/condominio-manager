@@ -4,20 +4,27 @@ import { FormEvent, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
-import { generateUnits, getUnitNumber } from "@/lib/services/unitService";
+import { getUnitNumber } from "@/lib/services/unitService";
+import { useGenerateUnits } from "@/lib/mutations/useUnitMutations";
 
 export default function GenerateUnits() {
   const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
+  const buildingId = params.buildingId as string;
+  const condominiumId = params.id as string;
+
   const [floors, setFloors] = useState("");
   const [unitsPerFloor, setUnitsPerFloor] = useState("");
-  const [unitType, setUnitType] = useState<"residential" | "office">("residential");
+  const [unitType, setUnitType] = useState<"residential" | "office">(
+    "residential"
+  );
   const [prefix, setPrefix] = useState("");
   const [suffix, setSuffix] = useState("");
   const [floorOffset, setFloorOffset] = useState("0");
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  const { mutate: generateUnits, isPending: submitting } = useGenerateUnits();
 
   const canCreate =
     appUser?.role === "admin" || appUser?.role === "administrator";
@@ -33,7 +40,7 @@ export default function GenerateUnits() {
             Solo los administradores pueden gestionar unidades.
           </p>
           <Link
-            href={`/condominium/${params.id}/buildings/${params.buildingId}`}
+            href={`/condominium/${condominiumId}/buildings/${buildingId}`}
             className="h-10 rounded-full border border-zinc-200 px-6 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
           >
             Volver
@@ -43,29 +50,41 @@ export default function GenerateUnits() {
     );
   }
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const f = parseInt(floors, 10);
     const u = parseInt(unitsPerFloor, 10);
     const fo = parseInt(floorOffset, 10);
     if (isNaN(f) || isNaN(u) || f < 1 || u < 1 || isNaN(fo) || fo < 0) return;
-    setSubmitting(true);
     setError("");
 
-    try {
-      await generateUnits(params.buildingId as string, f, u, unitType, fo, prefix, suffix);
-      router.push(`/condominium/${params.id}/buildings/${params.buildingId}`);
-    } catch {
-      setError("Ocurrió un error al generar las unidades. Intenta de nuevo.");
-      setSubmitting(false);
-    }
+    generateUnits(
+      {
+        buildingId,
+        floors: f,
+        unitsPerFloor: u,
+        type: unitType,
+        floorOffset: fo,
+        prefix,
+        suffix,
+      },
+      {
+        onSuccess: () =>
+          router.push(`/condominium/${condominiumId}/buildings/${buildingId}`),
+        onError: () =>
+          setError(
+            "Ocurrió un error al generar las unidades. Intenta de nuevo."
+          ),
+      }
+    );
   };
 
   const preview = (() => {
     const f = parseInt(floors, 10);
     const u = parseInt(unitsPerFloor, 10);
     const fo = parseInt(floorOffset, 10);
-    if (isNaN(f) || isNaN(u) || f < 1 || u < 1 || isNaN(fo) || fo < 0) return null;
+    if (isNaN(f) || isNaN(u) || f < 1 || u < 1 || isNaN(fo) || fo < 0)
+      return null;
     const rows: { floor: number; nums: string[] }[] = [];
     for (let fi = 0; fi < f; fi++) {
       const actualFloor = fi + fo;
@@ -89,14 +108,14 @@ export default function GenerateUnits() {
         </Link>
         <span>/</span>
         <Link
-          href={`/condominium/${params.id}`}
+          href={`/condominium/${condominiumId}`}
           className="hover:text-zinc-700 dark:hover:text-zinc-200"
         >
           Condominio
         </Link>
         <span>/</span>
         <Link
-          href={`/condominium/${params.id}/buildings/${params.buildingId}`}
+          href={`/condominium/${condominiumId}/buildings/${buildingId}`}
           className="hover:text-zinc-700 dark:hover:text-zinc-200"
         >
           Edificio
@@ -287,7 +306,7 @@ export default function GenerateUnits() {
                 : `Generar ${preview ? parseInt(floors) * parseInt(unitsPerFloor) : ""} unidades`}
             </button>
             <Link
-              href={`/condominium/${params.id}/buildings/${params.buildingId}`}
+              href={`/condominium/${condominiumId}/buildings/${buildingId}`}
               className="flex h-11 items-center rounded-full border border-zinc-200 px-6 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
             >
               Cancelar

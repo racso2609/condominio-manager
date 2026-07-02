@@ -4,34 +4,43 @@ import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
-import { getBuilding, updateBuilding } from "@/lib/services/buildingService";
+import { useBuilding } from "@/lib/queries/useBuilding";
+import { useUpdateBuilding } from "@/lib/mutations/useBuildingMutations";
 import { FormSkeleton } from "@/components/skeleton";
 
 export default function EditBuilding() {
   const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
+  const buildingId = params.buildingId as string;
+  const condominiumId = params.id as string;
+
+  const { data: building, isLoading } = useBuilding(buildingId);
+
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [address, setAddress] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const canEdit = appUser?.role === "admin" || appUser?.role === "administrator";
+  const { mutate: updateBuilding, isPending: submitting } =
+    useUpdateBuilding();
+
+  const canEdit =
+    appUser?.role === "admin" || appUser?.role === "administrator";
 
   useEffect(() => {
-    if (!params.buildingId) return;
-    getBuilding(params.buildingId as string).then((b) => {
-      if (!b) router.replace(`/condominium/${params.id}`);
-      else {
-        setName(b.name);
-        setSymbol(b.symbol);
-        setAddress(b.address ?? "");
-      }
-      setLoading(false);
-    });
-  }, [params.buildingId, params.id, router]);
+    if (building) {
+      setName(building.name);
+      setSymbol(building.symbol);
+      setAddress(building.address ?? "");
+    }
+  }, [building]);
+
+  useEffect(() => {
+    if (!isLoading && building === null) {
+      router.replace(`/condominium/${condominiumId}`);
+    }
+  }, [isLoading, building, router, condominiumId]);
 
   if (!canEdit) {
     return (
@@ -44,7 +53,7 @@ export default function EditBuilding() {
             Solo los administradores pueden editar edificios.
           </p>
           <Link
-            href={`/condominium/${params.id}`}
+            href={`/condominium/${condominiumId}`}
             className="h-10 rounded-full border border-zinc-200 px-6 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
           >
             Volver
@@ -54,45 +63,54 @@ export default function EditBuilding() {
     );
   }
 
-  if (loading) {
+  if (isLoading) {
     return <FormSkeleton titleWidth="w-40" inputCount={3} />;
   }
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !symbol.trim()) return;
-    setSubmitting(true);
     setError("");
 
-    try {
-      await updateBuilding(params.buildingId as string, {
-        name: name.trim(),
-        symbol: symbol.trim(),
-        address: address.trim() || undefined,
-      });
-      router.push(`/condominium/${params.id}/buildings/${params.buildingId}`);
-    } catch {
-      setError("Ocurrió un error al guardar los cambios. Intenta de nuevo.");
-      setSubmitting(false);
-    }
+    updateBuilding(
+      {
+        id: buildingId,
+        data: {
+          name: name.trim(),
+          symbol: symbol.trim(),
+          address: address.trim() || undefined,
+        },
+      },
+      {
+        onSuccess: () =>
+          router.push(`/condominium/${condominiumId}/buildings/${buildingId}`),
+        onError: () =>
+          setError(
+            "Ocurrió un error al guardar los cambios. Intenta de nuevo."
+          ),
+      }
+    );
   };
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
       <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-        <Link href="/home" className="hover:text-zinc-700 dark:hover:text-zinc-200">
+        <Link
+          href="/home"
+          className="hover:text-zinc-700 dark:hover:text-zinc-200"
+        >
           Mis condominios
         </Link>
         <span>/</span>
         <Link
-          href={`/condominium/${params.id}`}
+          href={`/condominium/${condominiumId}`}
           className="hover:text-zinc-700 dark:hover:text-zinc-200"
         >
           Condominio
         </Link>
         <span>/</span>
         <Link
-          href={`/condominium/${params.id}/buildings/${params.buildingId}`}
+          href={`/condominium/${condominiumId}/buildings/${buildingId}`}
           className="hover:text-zinc-700 dark:hover:text-zinc-200"
         >
           Edificio
@@ -172,7 +190,7 @@ export default function EditBuilding() {
               {submitting ? "Guardando..." : "Guardar cambios"}
             </button>
             <Link
-              href={`/condominium/${params.id}/buildings/${params.buildingId}`}
+              href={`/condominium/${condominiumId}/buildings/${buildingId}`}
               className="flex h-11 items-center rounded-full border border-zinc-200 px-6 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
             >
               Cancelar
