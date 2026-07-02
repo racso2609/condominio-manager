@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Button } from "@/components/Button";
 import { User } from "firebase/auth";
 import { AppUser } from "@/lib/types";
 
@@ -55,18 +55,12 @@ export function AccountSection({
         </div>
 
         <div className="flex gap-2">
-          <Link
-            href="/profile"
-            className="h-9 rounded-full border border-zinc-200 px-5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
-          >
+          <Button href="/profile" variant="secondary" size="md">
             Perfil
-          </Link>
-          <button
-            onClick={logout}
-            className="h-9 rounded-full border border-zinc-200 px-5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
-          >
+          </Button>
+          <Button onClick={logout} variant="secondary" size="md">
             Cerrar sesión
-          </button>
+          </Button>
         </div>
       </header>
     </section>

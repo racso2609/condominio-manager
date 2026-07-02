@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
 import { getCondominium } from "@/lib/services/condominiumService";
 import {
@@ -108,12 +109,13 @@ export default function PaymentMethodsPage() {
             {condominium.name}
           </p>
         </div>
-        <Link
+        <Button
           href={`/condominium/${condominium.id}/payment-methods/new`}
-          className="h-10 rounded-full bg-zinc-900 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+          variant="primary"
+          size="lg"
         >
           Nuevo método
-        </Link>
+        </Button>
       </div>
 
       {methods.length === 0 ? (
@@ -197,13 +199,16 @@ export default function PaymentMethodsPage() {
                   )}
                 </div>
 
-                <button
+                <Button
+                  type="button"
                   onClick={() => handleDelete(method.id)}
                   disabled={deletingId === method.id}
-                  className="rounded-full px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/20"
                 >
                   {deletingId === method.id ? "..." : "Eliminar"}
-                </button>
+                </Button>
               </div>
             </div>
           ))}

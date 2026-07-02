@@ -16,6 +16,7 @@ import {
   verifyUnitOwner,
   rejectUnitClaim,
   removeUnitOwner,
+  assignUnitOwner,
 } from "@/lib/services/unitService";
 import { getUser } from "@/lib/services/userService";
 import {
@@ -38,6 +39,7 @@ import {
   PaymentMethod,
   PaymentMethodType,
 } from "@/lib/types";
+import { Button } from "@/components/Button";
 import Collapse from "@/components/Collapse";
 import PaymentOrderItem from "@/components/PaymentOrderItem";
 
@@ -58,9 +60,14 @@ export default function ResidentsPage() {
   const [condominium, setCondominium] = useState<Condominium | null>(null);
   const [roles, setRoles] = useState<CondominiumRole[]>([]);
   const [buildings, setBuildings] = useState<Building[]>([]);
+  const [allUnits, setAllUnits] = useState<Unit[]>([]);
   const [pendingUnits, setPendingUnits] = useState<Unit[]>([]);
   const [unitsByOwner, setUnitsByOwner] = useState<Record<string, Unit[]>>({});
   const [owners, setOwners] = useState<Record<string, AppUser>>({});
+  const [assigningForRole, setAssigningForRole] = useState<string | null>(null);
+  const [assignBuildingId, setAssignBuildingId] = useState("");
+  const [assignUnitId, setAssignUnitId] = useState("");
+  const [assigning, setAssigning] = useState(false);
   const [expenses, setExpenses] = useState<Record<string, Expense>>({});
   const [entriesByUnit, setEntriesByUnit] = useState<
     Record<string, ExpenseEntry[]>
@@ -94,13 +101,15 @@ export default function ResidentsPage() {
       setBuildings(b);
       setPaymentMethods(methods);
 
+      const units: Unit[] = [];
       const pending: Unit[] = [];
       const ownerIds = new Set<string>();
       const byOwner: Record<string, Unit[]> = {};
 
       for (const building of b) {
-        const units = await getUnitsByBuilding(building.id);
-        for (const u of units) {
+        const buildingUnits = await getUnitsByBuilding(building.id);
+        for (const u of buildingUnits) {
+          units.push(u);
           if (u.owner) {
             if (!byOwner[u.owner]) byOwner[u.owner] = [];
             byOwner[u.owner].push(u);
@@ -111,8 +120,15 @@ export default function ResidentsPage() {
           }
         }
       }
+      setAllUnits(units);
       setPendingUnits(pending);
       setUnitsByOwner(byOwner);
+
+      for (const role of r) {
+        if (role.role === "resident" && role.user) {
+          ownerIds.add(role.user);
+        }
+      }
 
       const ownerMap: Record<string, AppUser> = {};
       for (const oid of ownerIds) {
@@ -230,6 +246,34 @@ export default function ResidentsPage() {
     }
   };
 
+  const handleAssignUnit = async (residentId: string) => {
+    if (!assignUnitId) return;
+    setAssigning(true);
+    try {
+      await assignUnitOwner(assignUnitId, residentId);
+      const unit = allUnits.find((u) => u.id === assignUnitId);
+      if (unit) {
+        const updatedUnit = { ...unit, owner: residentId, owner_status: "verified" as const };
+        setAllUnits((prev) =>
+          prev.map((u) => (u.id === assignUnitId ? updatedUnit : u))
+        );
+        setUnitsByOwner((prev) => {
+          const next = { ...prev };
+          if (!next[residentId]) next[residentId] = [];
+          next[residentId] = [...next[residentId], updatedUnit];
+          return next;
+        });
+      }
+      setAssigningForRole(null);
+      setAssignBuildingId("");
+      setAssignUnitId("");
+    } catch {
+      alert("Error al asignar la unidad");
+    } finally {
+      setAssigning(false);
+    }
+  };
+
   const handleValidatePayment = async (entryId: string, note: string) => {
     if (!appUser) return;
     setValidatingPaymentId(entryId);
@@ -339,32 +383,52 @@ export default function ResidentsPage() {
                   key={u.id}
                   className="flex items-center gap-4 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 dark:border-amber-900 dark:bg-amber-900/20"
                 >
+                  {owner?.photoURL ? (
+                    <img
+                      src={owner.photoURL}
+                      alt={owner.name}
+                      className="h-12 w-12 rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-200 text-sm font-semibold text-amber-700 dark:bg-amber-900 dark:text-amber-400">
+                      {(owner?.name ?? "?").charAt(0).toUpperCase()}
+                    </span>
+                  )}
                   <div className="flex-1">
                     <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                       {owner?.name ?? "Usuario desconocido"}
                     </p>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {owner?.email ?? ""} — {building?.name ?? ""} / Unidad{" "}
-                      {u.num}
+                      {owner?.email ?? ""}
+                      {owner?.phone && (
+                        <span className="ml-1">· {owner.phone}</span>
+                      )}
+                      {building && (
+                        <span className="ml-1">
+                          · {building.name} / Unidad {u.num}
+                        </span>
+                      )}
                     </p>
                   </div>
                   <div className="flex gap-2">
                     {role && (
-                      <button
+                      <Button
                         onClick={() => handleVerify(u.id, role.id)}
                         disabled={verifying === u.id}
-                        className="h-9 rounded-full bg-emerald-600 px-5 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
+                        variant="emerald"
+                        size="md"
                       >
                         {verifying === u.id ? "Validando..." : "Validar"}
-                      </button>
+                      </Button>
                     )}
-                    <button
+                    <Button
                       onClick={() => handleReject(u.id)}
                       disabled={rejecting === u.id}
-                      className="h-9 rounded-full border border-red-300 px-5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                      variant="danger"
+                      size="md"
                     >
                       {rejecting === u.id ? "..." : "Rechazar"}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               );
@@ -422,9 +486,88 @@ export default function ResidentsPage() {
                   }
                 >
                   {units.length === 0 ? (
-                    <p className="text-sm text-zinc-400">
-                      Sin unidades asignadas
-                    </p>
+                    <div className="flex flex-col gap-3">
+                      <p className="text-sm text-zinc-400">
+                        Sin unidades asignadas
+                      </p>
+                      {assigningForRole === r.id ? (
+                        <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-black">
+                          <label className="flex flex-col gap-1.5">
+                            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                              Edificio
+                            </span>
+                            <select
+                              value={assignBuildingId}
+                              onChange={(e) => {
+                                setAssignBuildingId(e.target.value);
+                                setAssignUnitId("");
+                              }}
+                              className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
+                            >
+                              <option value="">Selecciona un edificio</option>
+                              {buildings.map((b) => (
+                                <option key={b.id} value={b.id}>
+                                  {b.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="flex flex-col gap-1.5">
+                            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                              Unidad
+                            </span>
+                            <select
+                              value={assignUnitId}
+                              onChange={(e) => setAssignUnitId(e.target.value)}
+                              disabled={!assignBuildingId}
+                              className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 disabled:opacity-50 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
+                            >
+                              <option value="">Selecciona una unidad</option>
+                              {allUnits
+                                .filter(
+                                  (u) =>
+                                    u.building === assignBuildingId && !u.owner
+                                )
+                                .map((u) => (
+                                  <option key={u.id} value={u.id}>
+                                    {u.num}
+                                  </option>
+                                ))}
+                            </select>
+                          </label>
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => handleAssignUnit(r.user)}
+                              disabled={!assignUnitId || assigning}
+                              variant="primary"
+                              size="md"
+                            >
+                              {assigning ? "Asignando..." : "Asignar"}
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                setAssigningForRole(null);
+                                setAssignBuildingId("");
+                                setAssignUnitId("");
+                              }}
+                              disabled={assigning}
+                              variant="secondary"
+                              size="md"
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button
+                          onClick={() => setAssigningForRole(r.id)}
+                          variant="secondary"
+                          size="md"
+                        >
+                          Asignar unidad
+                        </Button>
+                      )}
+                    </div>
                   ) : (
                     <div className="flex flex-col gap-4">
                       <div className="flex flex-col gap-1.5">
@@ -464,19 +607,20 @@ export default function ResidentsPage() {
                                   : "Pendiente"}
                               </span>
                               {canRemove && (
-                                <button
+                                <Button
                                   onClick={() =>
                                     handleRemoveOwner(u.id, r.user, r.id)
                                   }
                                   disabled={removingUnitId === u.id}
-                                  className="inline-flex shrink-0 items-center justify-center rounded-full border border-red-300 px-2.5 py-1.5 text-[10px] font-medium leading-none text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                                  variant="danger"
+                                  size="xs"
                                 >
                                   {removingUnitId === u.id
                                     ? "..."
                                     : isSelf
                                       ? "Renunciar"
                                       : "Revocar"}
-                                </button>
+                                </Button>
                               )}
                             </div>
                           );

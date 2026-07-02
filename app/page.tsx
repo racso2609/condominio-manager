@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthContext } from "@/context/authContext";
+import { Button } from "@/components/Button";
 
 export default function LoginPage() {
   const { user, login, loading } = useAuthContext();
@@ -24,9 +25,11 @@ export default function LoginPage() {
         <p className="max-w-sm text-center text-zinc-600 dark:text-zinc-400">
           Accede con tu cuenta de Google para continuar
         </p>
-        <button
+        <Button
+          variant="secondary"
+          size="lg"
           onClick={() => login?.("google")}
-          className="flex h-12 items-center gap-3 rounded-full border border-zinc-200 bg-white px-6 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          className="h-12 gap-3 bg-white text-zinc-700 shadow-sm dark:bg-zinc-900 dark:text-zinc-200"
         >
           <svg className="h-5 w-5" viewBox="0 0 24 24">
             <path
@@ -47,7 +50,7 @@ export default function LoginPage() {
             />
           </svg>
           Continuar con Google
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
 import { getCondominium, updateCondominiumStatus } from "@/lib/services/condominiumService";
 import { getBuildingsByCondominium } from "@/lib/services/buildingService";
 import { getUnitsByBuilding } from "@/lib/services/unitService";
-import { Condominium, Building } from "@/lib/types";
+import { getEntriesByUnits } from "@/lib/services/expenseEntryService";
+import { Condominium, Building, Unit, ExpenseEntry } from "@/lib/types";
 import StatusBadge from "@/components/StatusBadge";
 
 export default function CondominiumDetail() {
@@ -16,6 +18,8 @@ export default function CondominiumDetail() {
   const router = useRouter();
   const [condominium, setCondominium] = useState<Condominium | null>(null);
   const [buildings, setBuildings] = useState<Building[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [entries, setEntries] = useState<ExpenseEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [changingStatus, setChangingStatus] = useState(false);
   const isAdminOrManager =
@@ -24,18 +28,35 @@ export default function CondominiumDetail() {
   const fetchData = async () => {
     if (!params.id) return;
     const id = params.id as string;
-    const [c, b] = await Promise.all([getCondominium(id), getBuildingsByCondominium(id)]);
-    if (!c) router.replace("/home");
-    else {
-      setCondominium(c);
-      setBuildings(b);
+    const [c, b] = await Promise.all([
+      getCondominium(id),
+      getBuildingsByCondominium(id),
+    ]);
+    if (!c) {
+      router.replace("/home");
+      setLoading(false);
+      return;
     }
+    setCondominium(c);
+    setBuildings(b);
+
+    const allUnits = (
+      await Promise.all(b.map((building) => getUnitsByBuilding(building.id)))
+    ).flat();
+    setUnits(allUnits);
+
+    if (allUnits.length > 0) {
+      const unitIds = allUnits.map((u) => u.id);
+      const expenseEntries = await getEntriesByUnits(unitIds);
+      setEntries(expenseEntries);
+    }
+
     setLoading(false);
   };
 
   useEffect(() => {
     fetchData();
-  }, [params.id, router]);
+  }, [params.id, router, appUser]);
 
   const handleToggleStatus = async () => {
     if (!condominium || !appUser) return;
@@ -77,6 +98,10 @@ export default function CondominiumDetail() {
 
   if (!condominium) return null;
 
+  const pendingAmount = entries
+    .filter((e) => e.status === "pending" || e.status === "pending_validation")
+    .reduce((sum, e) => sum + e.amount, 0);
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
       <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
@@ -105,74 +130,103 @@ export default function CondominiumDetail() {
         {isAdminOrManager && (
           <div className="flex gap-2">
             {condominium.status === "draft" && (
-              <button
+              <Button
                 onClick={handleToggleStatus}
                 disabled={changingStatus}
-                className="h-10 rounded-full bg-emerald-600 px-5 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
+                variant="emerald"
+                size="lg"
               >
                 {changingStatus ? "..." : "Completar registro"}
-              </button>
+              </Button>
             )}
             {condominium.status === "complete" && (
-              <button
+              <Button
                 onClick={handleToggleStatus}
                 disabled={changingStatus}
-                className="h-10 rounded-full border border-zinc-200 px-5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                variant="secondary"
+                size="lg"
               >
                 {changingStatus ? "..." : "Volver a borrador"}
-              </button>
+              </Button>
             )}
-            <Link
+            <Button
               href={`/condominium/${condominium.id}/buildings/new`}
-              className="flex h-10 items-center rounded-full bg-zinc-900 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+              variant="primary"
+              size="lg"
             >
               Añadir edificio
-            </Link>
+            </Button>
           </div>
         )}
       </div>
 
+      {units.length > 0 && (
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-black">
+          <div>
+            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              Monto pendiente
+            </p>
+            <p className="mt-1 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+              ${pendingAmount.toFixed(2)}
+            </p>
+          </div>
+          <Button
+            href={`/condominium/${condominium.id}/pagos`}
+            variant="primary"
+            size="md"
+          >
+            Ir a pagos
+          </Button>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         {isAdminOrManager && (
           <>
-            <Link
+            <Button
               href={`/condominium/${condominium.id}/announcements`}
-              className="flex h-9 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              variant="secondary"
+              size="md"
             >
               Anuncios
-            </Link>
-            <Link
+            </Button>
+            <Button
               href={`/condominium/${condominium.id}/expenses`}
-              className="flex h-9 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              variant="secondary"
+              size="md"
             >
               Gastos
-            </Link>
-            <Link
+            </Button>
+            <Button
               href={`/condominium/${condominium.id}/invite`}
-              className="flex h-9 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              variant="secondary"
+              size="md"
             >
               Invitar residentes
-            </Link>
-            <Link
+            </Button>
+            <Button
               href={`/condominium/${condominium.id}/residents`}
-              className="flex h-9 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              variant="secondary"
+              size="md"
             >
               Gestionar residentes
-            </Link>
-            <Link
+            </Button>
+            <Button
               href={`/condominium/${condominium.id}/payment-methods`}
-              className="flex h-9 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              variant="secondary"
+              size="md"
             >
               Métodos de pago
-            </Link>
+            </Button>
           </>
         )}
-        <Link
+        <Button
           href={`/condominium/${condominium.id}/pagos`}
-          className="flex h-9 items-center rounded-full border border-zinc-200 px-4 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+          variant="secondary"
+          size="md"
         >
           Mis pagos
-        </Link>
+        </Button>
       </div>
 
       {buildings.length === 0 ? (

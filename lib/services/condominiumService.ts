@@ -117,6 +117,29 @@ export async function createInvite(
   return { id: ref.id, ...roleData };
 }
 
+export async function createGlobalInvite(
+  condominiumId: string,
+  invitedBy: string,
+): Promise<CondominiumRole> {
+  const now = Timestamp.now();
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+  const ref = doc(collection(db, ROLE_COLLECTION));
+  const roleData = {
+    condominium: condominiumId,
+    user: "",
+    role: "resident" as const,
+    status: "pending" as const,
+    invited_by: invitedBy,
+    token: generateToken(),
+    expires_at: Timestamp.fromDate(expiresAt),
+    created_at: now,
+    updated_at: now,
+  };
+  await setDoc(ref, roleData);
+  return { id: ref.id, ...roleData };
+}
+
 export async function getInviteByToken(token: string): Promise<CondominiumRole | null> {
   const snapshot = await getDocs(
     query(collection(db, ROLE_COLLECTION), where("token", "==", token))

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Button } from "@/components/Button";
 import { CondominiumRole } from "@/lib/types";
 
 interface InvitesSectionProps {
@@ -40,12 +40,9 @@ export function InvitesSection({ pendingInvites }: InvitesSectionProps) {
                 </p>
                 <p className="text-xs text-zinc-500">{inv.invited_email}</p>
               </div>
-              <Link
-                href={`/invite?token=${inv.token}`}
-                className="h-8 rounded-full bg-amber-600 px-4 text-xs font-medium text-white transition-colors hover:bg-amber-500"
-              >
+              <Button href={`/invite?token=${inv.token}`} variant="amber" size="sm">
                 Ver invitación
-              </Link>
+              </Button>
             </div>
           ))}
         </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
 import { updateUser } from "@/lib/services/userService";
 
@@ -97,13 +98,14 @@ export default function ProfilePage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
+          <Button
             type="submit"
             disabled={saving}
-            className="h-10 rounded-full bg-zinc-900 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+            variant="primary"
+            size="lg"
           >
             {saving ? "Guardando..." : "Guardar cambios"}
-          </button>
+          </Button>
           {saved && (
             <span className="text-sm text-emerald-600 dark:text-emerald-400">
               Cambios guardados

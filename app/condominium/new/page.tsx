@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
 import { createCondominium } from "@/lib/services/condominiumService";
 
@@ -26,12 +27,9 @@ export default function NewCondominium() {
           <p className="max-w-sm text-zinc-500 dark:text-zinc-400">
             Solo los administradores pueden crear condominios.
           </p>
-          <Link
-            href="/home"
-            className="h-10 rounded-full border border-zinc-200 px-6 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
-          >
+          <Button href="/home" variant="secondary" size="lg">
             Volver al inicio
-          </Link>
+          </Button>
         </div>
       </div>
     );
@@ -116,19 +114,23 @@ export default function NewCondominium() {
           )}
 
           <div className="flex gap-3">
-            <button
+            <Button
               type="submit"
               disabled={submitting || !name.trim() || !address.trim()}
-              className="h-11 rounded-full bg-zinc-900 px-8 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+              variant="primary"
+              size="lg"
+              className="h-11 px-8 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {submitting ? "Creando..." : "Crear condominio"}
-            </button>
-            <Link
+            </Button>
+            <Button
               href="/home"
-              className="flex h-11 items-center rounded-full border border-zinc-200 px-6 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              variant="secondary"
+              size="lg"
+              className="h-11 px-6"
             >
               Cancelar
-            </Link>
+            </Button>
           </div>
         </form>
       </div>

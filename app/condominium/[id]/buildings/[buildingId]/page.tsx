@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
 import { getBuilding, deleteBuilding } from "@/lib/services/buildingService";
 import {
@@ -25,6 +26,7 @@ export default function BuildingDetail() {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectMode, setSelectMode] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [owners, setOwners] = useState<Record<string, AppUser>>({});
   const [claiming, setClaiming] = useState<string | null>(null);
@@ -36,21 +38,25 @@ export default function BuildingDetail() {
   useEffect(() => {
     if (!params.buildingId) return;
     const id = params.buildingId as string;
-    Promise.all([getBuilding(id), getUnitsByBuilding(id)]).then(async ([b, u]) => {
-      if (!b) router.replace(`/condominium/${params.id}`);
-      else {
-        setBuilding(b);
-        setUnits(u);
-        const ownerIds = new Set(u.filter((unit) => unit.owner).map((unit) => unit.owner));
-        const ownerMap: Record<string, AppUser> = {};
-        for (const oid of ownerIds) {
-          const user = await getUser(oid);
-          if (user) ownerMap[oid] = user;
+    Promise.all([getBuilding(id), getUnitsByBuilding(id)]).then(
+      async ([b, u]) => {
+        if (!b) router.replace(`/condominium/${params.id}`);
+        else {
+          setBuilding(b);
+          setUnits(u);
+          const ownerIds = new Set(
+            u.filter((unit) => unit.owner).map((unit) => unit.owner),
+          );
+          const ownerMap: Record<string, AppUser> = {};
+          for (const oid of ownerIds) {
+            const user = await getUser(oid);
+            if (user) ownerMap[oid] = user;
+          }
+          setOwners(ownerMap);
         }
-        setOwners(ownerMap);
-      }
-      setLoading(false);
-    });
+        setLoading(false);
+      },
+    );
   }, [params.buildingId, params.id, router]);
 
   const toggleUnit = (id: string) => {
@@ -71,6 +77,13 @@ export default function BuildingDetail() {
   }, [selected.size, units]);
 
   const clearSelection = () => setSelected(new Set());
+
+  const toggleSelectMode = () => {
+    setSelectMode((prev) => {
+      if (prev) setSelected(new Set());
+      return !prev;
+    });
+  };
 
   const bulkDelete = async () => {
     if (!window.confirm(`¿Eliminar ${selected.size} unidades seleccionadas?`))
@@ -108,12 +121,6 @@ export default function BuildingDetail() {
     }
   };
 
-  const handleDeleteUnit = async (unitId: string, unitNum: string) => {
-    if (!window.confirm(`¿Eliminar unidad ${unitNum}?`)) return;
-    await deleteUnit(unitId);
-    setUnits((prev) => prev.filter((u) => u.id !== unitId));
-  };
-
   const handleClaim = async (unitId: string) => {
     if (!appUser) return;
     setClaiming(unitId);
@@ -123,8 +130,8 @@ export default function BuildingDetail() {
         prev.map((u) =>
           u.id === unitId
             ? { ...u, owner: appUser.id, owner_status: "pending" as const }
-            : u
-        )
+            : u,
+        ),
       );
       const owner = await getUser(appUser.id);
       if (owner) setOwners((prev) => ({ ...prev, [appUser.id]: owner }));
@@ -141,8 +148,8 @@ export default function BuildingDetail() {
       await verifyUnitOwner(unitId);
       setUnits((prev) =>
         prev.map((u) =>
-          u.id === unitId ? { ...u, owner_status: "verified" as const } : u
-        )
+          u.id === unitId ? { ...u, owner_status: "verified" as const } : u,
+        ),
       );
     } catch {
       alert("Error al validar");
@@ -152,16 +159,19 @@ export default function BuildingDetail() {
   };
 
   const handleReject = async (unitId: string) => {
-    if (!window.confirm("¿Rechazar esta solicitud? El usuario no podrá reclamar esta unidad por 1 semana.")) return;
+    if (
+      !window.confirm(
+        "¿Rechazar esta solicitud? El usuario no podrá reclamar esta unidad por 1 semana.",
+      )
+    )
+      return;
     setRejecting(unitId);
     try {
       await rejectUnitClaim(unitId);
       setUnits((prev) =>
         prev.map((u) =>
-          u.id === unitId
-            ? { ...u, owner: "", owner_status: undefined }
-            : u
-        )
+          u.id === unitId ? { ...u, owner: "", owner_status: undefined } : u,
+        ),
       );
     } catch {
       alert("Error al rechazar");
@@ -219,18 +229,20 @@ export default function BuildingDetail() {
 
         {isAdminOrManager && (
           <div className="flex gap-2">
-            <Link
+            <Button
               href={`/condominium/${params.id}/buildings/${building.id}/edit`}
-              className="flex h-10 items-center rounded-full border border-zinc-200 px-5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              variant="secondary"
+              size="lg"
             >
               Editar
-            </Link>
-            <Link
+            </Button>
+            <Button
               href={`/condominium/${params.id}/buildings/${building.id}/duplicate`}
-              className="flex h-10 items-center rounded-full border border-zinc-200 px-5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              variant="secondary"
+              size="lg"
             >
               Duplicar
-            </Link>
+            </Button>
             <button
               onClick={handleDeleteBuilding}
               disabled={deleting}
@@ -247,12 +259,25 @@ export default function BuildingDetail() {
           Unidades {units.length > 0 && `(${units.length})`}
         </h2>
         {isAdminOrManager && (
-          <Link
-            href={`/condominium/${params.id}/buildings/${building.id}/units/new`}
-            className="h-9 rounded-full bg-zinc-900 px-5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
-          >
-            Generar unidades
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleSelectMode}
+              className={`h-9 rounded-full border px-5 text-sm font-medium transition-colors ${
+                selectMode
+                  ? "border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-800 dark:border-zinc-50 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+                  : "border-zinc-200 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              }`}
+            >
+              {selectMode ? "Cancelar selección" : "Seleccionar"}
+            </button>
+            <Button
+              href={`/condominium/${params.id}/buildings/${building.id}/units/new`}
+              variant="primary"
+              size="md"
+            >
+              Generar unidades
+            </Button>
+          </div>
         )}
       </div>
 
@@ -304,7 +329,7 @@ export default function BuildingDetail() {
         </section>
       ) : (
         <div className="flex flex-col gap-6">
-          {isAdminOrManager && units.length > 0 && (
+          {isAdminOrManager && selectMode && units.length > 0 && (
             <label className="flex cursor-pointer items-center gap-3 px-1 py-1">
               <input
                 type="checkbox"
@@ -321,7 +346,7 @@ export default function BuildingDetail() {
           )}
           {(() => {
             const floors = [...new Set(units.map((u) => u.floor))].sort(
-              (a, b) => b - a
+              (a, b) => b - a,
             );
             return floors.map((floor) => {
               const floorUnits = units
@@ -332,7 +357,7 @@ export default function BuildingDetail() {
                   <h3 className="mb-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
                     Piso {floor}
                   </h3>
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {floorUnits.map((u) => (
                       <div
                         key={u.id}
@@ -342,7 +367,7 @@ export default function BuildingDetail() {
                             : "border-zinc-200 dark:border-zinc-800"
                         }`}
                       >
-                        {isAdminOrManager && (
+                        {isAdminOrManager && selectMode && (
                           <input
                             type="checkbox"
                             checked={selected.has(u.id)}
@@ -383,18 +408,20 @@ export default function BuildingDetail() {
                               Bloqueada
                             </span>
                           )}
-                        {!u.owner && appUser && !isAdminOrManager && !(
-                          u.claim_blocked_until &&
-                          u.claim_blocked_until.toMillis() > Date.now()
-                        ) && (
-                          <button
-                            onClick={() => handleClaim(u.id)}
-                            disabled={claiming === u.id}
-                            className="ml-auto h-7 rounded-full border border-zinc-300 px-3 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                          >
-                            {claiming === u.id ? "..." : "Reclamar"}
-                          </button>
-                        )}
+                        {!u.owner &&
+                          appUser &&
+                          !(
+                            u.claim_blocked_until &&
+                            u.claim_blocked_until.toMillis() > Date.now()
+                          ) && (
+                            <button
+                              onClick={() => handleClaim(u.id)}
+                              disabled={claiming === u.id}
+                              className="ml-auto h-7 rounded-full border border-zinc-300 px-3 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                            >
+                              {claiming === u.id ? "..." : "Reclamar"}
+                            </button>
+                          )}
                         {isAdminOrManager &&
                           u.owner_status === "pending" &&
                           !selected.has(u.id) && (
@@ -415,14 +442,7 @@ export default function BuildingDetail() {
                               </button>
                             </>
                           )}
-                        {isAdminOrManager && !selected.has(u.id) && (
-                          <button
-                            onClick={() => handleDeleteUnit(u.id, u.num)}
-                            className="text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                          >
-                            Eliminar
-                          </button>
-                        )}
+
                       </div>
                     ))}
                   </div>

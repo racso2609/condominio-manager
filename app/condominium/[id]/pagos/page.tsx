@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
 import { getCondominium } from "@/lib/services/condominiumService";
 import { getUnitsByOwner } from "@/lib/services/unitService";
@@ -301,17 +302,18 @@ export default function ResidentPagosPage() {
                           </label>
 
                           <div className="flex gap-3">
-                            <button
+                            <Button
                               onClick={() => handleReportPayment(entry.id)}
                               disabled={
                                 reporting ||
                                 (!reportPaymentMethod && !reportReference)
                               }
-                              className="h-10 rounded-full bg-emerald-600 px-5 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
+                              variant="emerald"
+                              size="lg"
                             >
                               {reporting ? "Enviando..." : "Enviar reporte"}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               onClick={() => {
                                 setReportingEntryId(null);
                                 setReportPaymentMethod("");
@@ -319,10 +321,11 @@ export default function ResidentPagosPage() {
                                 setReportProof(null);
                               }}
                               disabled={reporting}
-                              className="flex h-10 items-center rounded-full border border-zinc-200 px-5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                              variant="secondary"
+                              size="lg"
                             >
                               Cancelar
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       </div>

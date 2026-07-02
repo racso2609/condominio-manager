@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
 import { createAnnouncement } from "@/lib/services/announcementService";
 
@@ -178,13 +179,15 @@ export default function NewAnnouncementPage() {
                     <span className="text-[10px] text-zinc-400">
                       {(f.size / 1024 / 1024).toFixed(1)} MB
                     </span>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="sm"
                       onClick={() => removeFile(i)}
-                      className="text-xs font-medium text-red-500 hover:text-red-700"
+                      className="h-auto px-0 text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                     >
                       Quitar
-                    </button>
+                    </Button>
                   </div>
                 );
               })}
@@ -193,19 +196,21 @@ export default function NewAnnouncementPage() {
         </div>
 
         <div className="flex gap-3">
-          <button
+          <Button
             type="submit"
             disabled={saving || !title.trim() || !content.trim()}
-            className="h-10 rounded-full bg-zinc-900 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+            variant="primary"
+            size="lg"
           >
             {saving ? "Publicando..." : "Publicar anuncio"}
-          </button>
-          <Link
+          </Button>
+          <Button
             href={`/condominium/${params.id}/announcements`}
-            className="flex h-10 items-center rounded-full border border-zinc-200 px-5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            variant="secondary"
+            size="lg"
           >
             Cancelar
-          </Link>
+          </Button>
         </div>
       </form>
     </div>

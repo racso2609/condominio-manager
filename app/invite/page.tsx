@@ -2,8 +2,8 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
+import { Button } from "@/components/Button";
 import { getInviteByToken, acceptInvite } from "@/lib/services/condominiumService";
 import { getCondominium } from "@/lib/services/condominiumService";
 import { CondominiumRole, Condominium } from "@/lib/types";
@@ -83,12 +83,9 @@ function InviteContent() {
         <div className="rounded-xl border border-red-200 bg-red-50 px-6 py-4 dark:border-red-900 dark:bg-red-900/20">
           <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
         </div>
-        <Link
-          href="/"
-          className="h-10 rounded-full bg-zinc-900 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
-        >
+        <Button href="/" variant="primary" size="lg">
           Ir al inicio
-        </Link>
+        </Button>
       </div>
     );
   }
@@ -105,12 +102,13 @@ function InviteContent() {
             Ahora puedes reclamar una unidad.
           </p>
         </div>
-        <Link
+        <Button
           href={`/condominium/${role?.condominium}`}
-          className="h-10 rounded-full bg-zinc-900 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+          variant="primary"
+          size="lg"
         >
           Ir al condominio
-        </Link>
+        </Button>
       </div>
     );
   }
@@ -133,12 +131,13 @@ function InviteContent() {
             <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
               Inicia sesión para aceptar la invitación
             </p>
-            <button
+            <Button
+              variant="primary"
+              size="lg"
               onClick={() => login?.("google")}
-              className="h-10 rounded-full bg-zinc-900 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
             >
               Iniciar sesión con Google
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="mt-6">
@@ -148,13 +147,14 @@ function InviteContent() {
                 Cierra sesión y entra con esa cuenta.
               </div>
             ) : (
-              <button
+              <Button
                 onClick={handleAccept}
                 disabled={accepting}
-                className="h-10 rounded-full bg-zinc-900 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+                variant="primary"
+                size="lg"
               >
                 {accepting ? "Aceptando..." : "Aceptar invitación"}
-              </button>
+              </Button>
             )}
           </div>
         )}

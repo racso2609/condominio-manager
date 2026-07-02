@@ -7,6 +7,7 @@ import { useAuthContext } from "@/context/authContext";
 import {
   getCondominium,
   createInvite,
+  createGlobalInvite,
   getCondominiumRoles,
 } from "@/lib/services/condominiumService";
 import { Condominium, CondominiumRole } from "@/lib/types";
@@ -22,6 +23,8 @@ export default function InviteResidentPage() {
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [lastLink, setLastLink] = useState("");
+  const [globalLink, setGlobalLink] = useState("");
+  const [generatingGlobal, setGeneratingGlobal] = useState(false);
   const [loading, setLoading] = useState(true);
   const isAdminOrManager =
     appUser?.role === "admin" || appUser?.role === "administrator";
@@ -33,7 +36,7 @@ export default function InviteResidentPage() {
       if (!c) router.replace("/home");
       else {
         setCondominium(c);
-        setRoles(r.filter((role) => role.invited_email));
+        setRoles(r.filter((role) => role.token));
       }
       setLoading(false);
     });
@@ -52,6 +55,21 @@ export default function InviteResidentPage() {
       alert("Error al enviar invitación");
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleCreateGlobalInvite = async () => {
+    if (!appUser || !condominium) return;
+    setGeneratingGlobal(true);
+    try {
+      const role = await createGlobalInvite(condominium.id, appUser.id);
+      const link = `${BASE_URL}/invite?token=${role.token}`;
+      setGlobalLink(link);
+      setRoles((prev) => [...prev, role]);
+    } catch {
+      alert("Error al generar el link de invitación");
+    } finally {
+      setGeneratingGlobal(false);
     }
   };
 
@@ -149,6 +167,36 @@ export default function InviteResidentPage() {
         </div>
       )}
 
+      <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-black">
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+          Invitación grupal
+        </h2>
+        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+          Genera un link que puedes compartir en un grupo para que cualquier persona se una al condominio.
+        </p>
+        {globalLink ? (
+          <div className="mt-4 flex gap-2">
+            <code className="flex-1 truncate rounded-lg bg-zinc-100 px-3 py-2 text-xs text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+              {globalLink}
+            </code>
+            <button
+              onClick={() => navigator.clipboard.writeText(globalLink)}
+              className="rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            >
+              Copiar
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleCreateGlobalInvite}
+            disabled={generatingGlobal}
+            className="mt-4 h-10 rounded-full bg-zinc-900 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+          >
+            {generatingGlobal ? "Generando..." : "Generar link grupal"}
+          </button>
+        )}
+      </div>
+
       {roles.length > 0 && (
         <section>
           <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
@@ -162,7 +210,7 @@ export default function InviteResidentPage() {
               >
                 <div className="flex-1">
                   <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                    {r.invited_email}
+                    {r.invited_email ?? "Link grupal"}
                   </p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
                     {r.user

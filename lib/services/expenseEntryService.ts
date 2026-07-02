@@ -104,10 +104,18 @@ export async function getEntriesByUnits(
   unitIds: string[]
 ): Promise<ExpenseEntry[]> {
   if (unitIds.length === 0) return [];
-  const snapshot = await getDocs(
-    query(collection(db, COLLECTION), where("unit", "in", unitIds))
-  );
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as ExpenseEntry);
+  const chunkSize = 30;
+  const entries: ExpenseEntry[] = [];
+  for (let i = 0; i < unitIds.length; i += chunkSize) {
+    const chunk = unitIds.slice(i, i + chunkSize);
+    const snapshot = await getDocs(
+      query(collection(db, COLLECTION), where("unit", "in", chunk))
+    );
+    entries.push(
+      ...snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as ExpenseEntry)
+    );
+  }
+  return entries;
 }
 
 export async function reportPayment(

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
 import { getCondominium } from "@/lib/services/condominiumService";
 import { getBuildingsByCondominium } from "@/lib/services/buildingService";
@@ -85,12 +86,13 @@ export default function ExpensesPage() {
           </p>
         </div>
         {isAdminOrManager && (
-          <Link
+          <Button
             href={`/condominium/${condominium.id}/expenses/new`}
-            className="h-10 rounded-full bg-zinc-900 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+            variant="primary"
+            size="lg"
           >
             Nuevo gasto
-          </Link>
+          </Button>
         )}
       </div>
 

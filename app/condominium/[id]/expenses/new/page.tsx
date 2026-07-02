@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
 import { getCondominium } from "@/lib/services/condominiumService";
 import { getBuildingsByCondominium } from "@/lib/services/buildingService";
@@ -299,19 +300,21 @@ export default function NewExpensePage() {
         </div>
 
         <div className="flex gap-3">
-          <button
+          <Button
             type="submit"
             disabled={saving || !title.trim() || !amount || !dueDate}
-            className="h-10 rounded-full bg-zinc-900 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+            variant="primary"
+            size="lg"
           >
             {saving ? "Creando..." : "Crear gasto"}
-          </button>
-          <Link
+          </Button>
+          <Button
             href={`/condominium/${params.id}/expenses`}
-            className="flex h-10 items-center rounded-full border border-zinc-200 px-5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            variant="secondary"
+            size="lg"
           >
             Cancelar
-          </Link>
+          </Button>
         </div>
       </form>
     </div>

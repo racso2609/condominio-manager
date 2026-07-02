@@ -147,6 +147,18 @@ export async function verifyUnitOwner(unitId: string): Promise<void> {
   });
 }
 
+export async function assignUnitOwner(
+  unitId: string,
+  userId: string,
+): Promise<void> {
+  await updateDoc(doc(db, COLLECTION, unitId), {
+    owner: userId,
+    owner_status: "verified",
+    claim_blocked_until: deleteField(),
+    updated_at: Timestamp.now(),
+  });
+}
+
 export async function removeUnitOwner(unitId: string): Promise<void> {
   await updateDoc(doc(db, COLLECTION, unitId), {
     owner: "",

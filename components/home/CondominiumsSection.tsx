@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import { Button } from "@/components/Button";
 import StatusBadge from "@/components/StatusBadge";
+import Link from "next/link";
 import { Condominium, AppUser } from "@/lib/types";
 
 interface CondominiumsSectionProps {
@@ -45,12 +46,9 @@ export function CondominiumsSection({
           </p>
           {(appUser?.role === "admin" ||
             appUser?.role === "administrator") && (
-            <Link
-              href="/condominium/new"
-              className="h-10 rounded-full bg-zinc-900 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
-            >
+            <Button href="/condominium/new" variant="primary" size="lg">
               Crear condominio
-            </Link>
+            </Button>
           )}
         </div>
       ) : (

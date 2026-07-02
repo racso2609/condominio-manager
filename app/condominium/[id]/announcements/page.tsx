@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/context/authContext";
+import { Button } from "@/components/Button";
 import { getCondominium } from "@/lib/services/condominiumService";
 import {
   getAnnouncementsByCondominium,
@@ -41,13 +42,15 @@ export default function AnnouncementsPage() {
           setAuthors(map);
         }
         setLoading(false);
-      }
+      },
     );
   }, [params.id, router]);
 
   const handleDelete = async (announcement: Announcement) => {
     if (
-      !window.confirm(`¿Eliminar "${announcement.title}"? Esta acción no se puede deshacer.`)
+      !window.confirm(
+        `¿Eliminar "${announcement.title}"? Esta acción no se puede deshacer.`,
+      )
     )
       return;
     try {
@@ -98,12 +101,13 @@ export default function AnnouncementsPage() {
           </p>
         </div>
         {isAdminOrManager && (
-          <Link
+          <Button
             href={`/condominium/${condominium.id}/announcements/new`}
-            className="h-10 rounded-full bg-zinc-900 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+            variant="primary"
+            size="lg"
           >
             Nuevo anuncio
-          </Link>
+          </Button>
         )}
       </div>
 
