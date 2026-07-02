@@ -9,13 +9,13 @@ import { getStorage } from "firebase/storage";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyC1_KQTG0iCOvQsZ2N7JbMNjG_Zfnzzj68",
-  authDomain: "condominio-gestion.firebaseapp.com",
-  projectId: "condominio-gestion",
-  storageBucket: "condominio-gestion.firebasestorage.app",
-  messagingSenderId: "365513058615",
-  appId: "1:365513058615:web:36a93045dfb8c7d23e12b2",
-  measurementId: "G-7PHGG4Q5N4",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
