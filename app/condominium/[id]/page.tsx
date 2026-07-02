@@ -5,11 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
-import { getCondominium, updateCondominiumStatus } from "@/lib/services/condominiumService";
+import { getCondominium, updateCondominiumStatus, getUserCondominiumRole } from "@/lib/services/condominiumService";
 import { getBuildingsByCondominium } from "@/lib/services/buildingService";
 import { getUnitsByBuilding } from "@/lib/services/unitService";
 import { getEntriesByUnits } from "@/lib/services/expenseEntryService";
-import { Condominium, Building, Unit, ExpenseEntry } from "@/lib/types";
+import { Condominium, Building, Unit, ExpenseEntry, CondominiumRole } from "@/lib/types";
 import StatusBadge from "@/components/StatusBadge";
 
 export default function CondominiumDetail() {
@@ -20,6 +20,7 @@ export default function CondominiumDetail() {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [entries, setEntries] = useState<ExpenseEntry[]>([]);
+  const [userRole, setUserRole] = useState<CondominiumRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [changingStatus, setChangingStatus] = useState(false);
   const isAdminOrManager =
@@ -28,9 +29,10 @@ export default function CondominiumDetail() {
   const fetchData = async () => {
     if (!params.id) return;
     const id = params.id as string;
-    const [c, b] = await Promise.all([
+    const [c, b, role] = await Promise.all([
       getCondominium(id),
       getBuildingsByCondominium(id),
+      appUser ? getUserCondominiumRole(appUser.id, id) : Promise.resolve(null),
     ]);
     if (!c) {
       router.replace("/home");
@@ -39,6 +41,7 @@ export default function CondominiumDetail() {
     }
     setCondominium(c);
     setBuildings(b);
+    setUserRole(role);
 
     const allUnits = (
       await Promise.all(b.map((building) => getUnitsByBuilding(building.id)))
@@ -159,6 +162,20 @@ export default function CondominiumDetail() {
           </div>
         )}
       </div>
+
+      {userRole?.role === "resident" && userRole?.status === "pending" && (
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-900/50 dark:bg-amber-900/20">
+          <h2 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+            Reclama tu unidad o apartamento
+          </h2>
+          <p className="mt-1 text-sm text-amber-700 dark:text-amber-200/80">
+            Para acceder a tus pagos, reportar pagos y usar todas las funcionalidades de residente, necesitas reclamar una unidad o apartamento en este condominio.
+          </p>
+          <p className="mt-2 text-sm text-amber-700 dark:text-amber-200/80">
+            Selecciona un edificio debajo y presiona <strong>Reclamar</strong> en la unidad que te corresponde. Un administrador validará tu solicitud.
+          </p>
+        </section>
+      )}
 
       {units.length > 0 && (
         <div className="flex items-center justify-between gap-4 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-black">
