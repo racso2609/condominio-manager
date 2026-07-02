@@ -217,7 +217,8 @@ export default function ResidentsPage() {
       const remainingCount = (unitsByOwner[ownerId] ?? []).filter(
         (u) => u.id !== unitId
       ).length;
-      if (remainingCount === 0) {
+      const removedRole = roles.find((r) => r.id === roleId);
+      if (remainingCount === 0 && removedRole?.role === "resident") {
         await deleteCondominiumRole(roleId);
         setRoles((prev) => prev.filter((r) => r.id !== roleId));
       }
@@ -447,11 +448,21 @@ export default function ResidentsPage() {
 
       <section>
         <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Residentes ({roles.filter((r) => r.role === "resident").length})
+          Residentes y propietarios ({
+            roles.filter(
+              (r) =>
+                r.role === "resident" ||
+                (r.role === "administrator" && unitsByOwner[r.user]?.length > 0)
+            ).length
+          })
         </h2>
         <div className="flex flex-col gap-2">
           {roles
-            .filter((r) => r.role === "resident")
+            .filter(
+              (r) =>
+                r.role === "resident" ||
+                (r.role === "administrator" && unitsByOwner[r.user]?.length > 0)
+            )
             .map((r) => {
               const owner = owners[r.user] ?? null;
               const units = unitsByOwner[r.user] ?? [];
