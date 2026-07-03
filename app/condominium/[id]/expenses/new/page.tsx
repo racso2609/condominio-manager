@@ -11,6 +11,7 @@ import { useUnitsByBuildings } from "@/lib/queries/useUnit";
 import { useCreateExpense } from "@/lib/mutations/useExpenseMutations";
 import { useCreateExpenseEntries } from "@/lib/mutations/useExpenseEntryMutations";
 import { FormSkeleton } from "@/components/skeleton";
+import { ExpenseItem } from "@/lib/types";
 
 export default function NewExpensePage() {
   const { appUser } = useAuthContext();
@@ -27,10 +28,45 @@ export default function NewExpensePage() {
   const [selectedBuilding, setSelectedBuilding] = useState(buildings[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
+  const [items, setItems] = useState<ExpenseItem[]>([
+    { id: crypto.randomUUID(), description: "", amount: 0 },
+  ]);
   const [dueDate, setDueDate] = useState("");
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
+
+  const totalAmount = useMemo(
+    () => Math.round(items.reduce((sum, item) => sum + item.amount, 0) * 100) / 100,
+    [items]
+  );
+
+  const addItem = () => {
+    setItems((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), description: "", amount: 0 },
+    ]);
+  };
+
+  const removeItem = (id: string) => {
+    setItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const updateItem = (id: string, updates: Partial<ExpenseItem>) => {
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              ...updates,
+              amount:
+                updates.amount !== undefined
+                  ? Math.round(updates.amount * 100) / 100
+                  : item.amount,
+            }
+          : item
+      )
+    );
+  };
 
   const effectiveSelectedBuilding = selectedBuilding || buildings[0]?.id || "";
 
@@ -68,9 +104,14 @@ export default function NewExpensePage() {
       return;
     }
 
-    const totalAmount = parseFloat(amount);
-    if (isNaN(totalAmount) || totalAmount <= 0) {
-      alert("Ingresa un monto válido.");
+    if (totalAmount <= 0) {
+      alert("El monto total debe ser mayor a cero.");
+      return;
+    }
+
+    const validItems = items.filter((item) => item.description.trim() !== "");
+    if (validItems.length === 0) {
+      alert("Agrega al menos un concepto con descripción.");
       return;
     }
 
@@ -95,7 +136,7 @@ export default function NewExpensePage() {
         building: scope === "building" ? effectiveSelectedBuilding : undefined,
         title: title.trim(),
         description: description.trim() || undefined,
-        amount: totalAmount,
+        items: validItems,
         due_date: new Date(dueDate),
         period_start: periodStart ? new Date(periodStart) : undefined,
         period_end: periodEnd ? new Date(periodEnd) : undefined,
@@ -240,22 +281,84 @@ export default function NewExpensePage() {
             />
           </label>
 
-          <div className="grid grid-cols-2 gap-4">
-            <label className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                Monto total ($)
+                Conceptos
               </span>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                required
-                className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
-              />
-            </label>
+              <button
+                type="button"
+                onClick={addItem}
+                className="text-xs font-medium text-zinc-900 underline underline-offset-2 hover:text-zinc-700 dark:text-zinc-50 dark:hover:text-zinc-300"
+              >
+                + Agregar concepto
+              </button>
+            </div>
 
+            <div className="flex flex-col gap-3">
+              {items.map((item, index) => (
+                <div
+                  key={item.id}
+                  className="grid grid-cols-[1fr,auto,auto] items-end gap-3"
+                >
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
+                      Descripción
+                    </span>
+                    <input
+                      type="text"
+                      value={item.description}
+                      onChange={(e) =>
+                        updateItem(item.id, { description: e.target.value })
+                      }
+                      placeholder="Ej. Mantenimiento ascensor"
+                      required
+                      className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
+                      Monto ($)
+                    </span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={item.amount || ""}
+                      onChange={(e) =>
+                        updateItem(item.id, {
+                          amount: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      required
+                      className="w-28 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
+                    />
+                  </label>
+                  {items.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeItem(item.id)}
+                      className="mb-2 text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                      aria-label={`Eliminar concepto ${index + 1}`}
+                    >
+                      Eliminar
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/30">
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Monto total
+              </span>
+              <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                ${totalAmount.toFixed(2)}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 Fecha de vencimiento
@@ -300,7 +403,7 @@ export default function NewExpensePage() {
         <div className="flex gap-3">
           <Button
             type="submit"
-            disabled={saving || !title.trim() || !amount || !dueDate}
+            disabled={saving || !title.trim() || totalAmount <= 0 || !dueDate}
             variant="primary"
             size="lg"
           >

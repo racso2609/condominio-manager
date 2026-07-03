@@ -56,6 +56,12 @@ export interface Unit {
   updated_at: string;
 }
 
+export interface ExpenseItem {
+  id: string;
+  description: string;
+  amount: number;
+}
+
 export interface Expense {
   id: string;
   condominium?: string;
@@ -63,6 +69,7 @@ export interface Expense {
   title: string;
   description?: string;
   amount: number;
+  items?: ExpenseItem[];
   due_date: string;
   period_start?: string;
   period_end?: string;

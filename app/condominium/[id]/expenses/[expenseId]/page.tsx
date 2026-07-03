@@ -156,6 +156,39 @@ export default function ExpenseDetailPage() {
         </p>
       </div>
 
+      {expense.items && expense.items.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
+            Conceptos
+          </h2>
+          <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-black">
+            <div className="flex flex-col gap-2">
+              {expense.items.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between gap-4 text-sm"
+                >
+                  <span className="text-zinc-700 dark:text-zinc-300">
+                    {item.description}
+                  </span>
+                  <span className="font-medium text-zinc-900 dark:text-zinc-50">
+                    ${item.amount.toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-4 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+              <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                Total
+              </span>
+              <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                ${expense.amount.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
           Pagos por unidad

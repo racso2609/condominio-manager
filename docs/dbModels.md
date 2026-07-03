@@ -60,6 +60,7 @@ expense:
 - title
 - description
 - amount
+- items (JSONB, optional) -- array of `{ id, description, amount }` line items
 - due_date
 - period_start
 - period_end
@@ -67,6 +68,7 @@ expense:
 - updated_at
 
 > One of `condominium` or `building` must be set (mutually exclusive). If `building` is set, the expense is for that specific building within the condominium. If `condominium` is set, the expense is for the entire condominium.
+> `amount` is the total of the expense. When `items` is provided, `amount` is calculated as the sum of the line items.
 
 announcement:
 

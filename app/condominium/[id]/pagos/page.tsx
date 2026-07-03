@@ -15,6 +15,7 @@ import {
 } from "@/lib/queries/useExpense";
 import { usePaymentMethodsByCondominium } from "@/lib/queries/usePaymentMethod";
 import { useReportPayment } from "@/lib/mutations/useExpenseEntryMutations";
+import { generatePaymentReceipt } from "@/lib/utils/receipt";
 import {
   PaymentMethodType,
 } from "@/lib/types";
@@ -156,6 +157,29 @@ export default function ResidentPagosPage() {
     );
   };
 
+  const handleDownloadReceipt = (entry: import("@/lib/types").ExpenseEntry) => {
+    const expense = expenses[entry.expense];
+    const unit = unitMap[entry.unit];
+    const building = unit ? buildings[unit.building] : undefined;
+    const paymentMethod = entry.payment_method_id
+      ? paymentMethods.find((m) => m.id === entry.payment_method_id)
+      : undefined;
+
+    if (!expense || !unit || !condominium) {
+      alert("No se encontró toda la información necesaria para generar el recibo.");
+      return;
+    }
+
+    generatePaymentReceipt({
+      condominium,
+      building,
+      unit,
+      expense,
+      entry,
+      paymentMethod,
+    });
+  };
+
   const pendingEntries = entries.filter(
     (e) => e.status === "pending" || e.status === "pending_validation"
   );
@@ -271,6 +295,18 @@ export default function ResidentPagosPage() {
                         dolarRate ? entry.amount * dolarRate : undefined
                       }
                     />
+
+                    {entry.status === "paid" && (
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadReceipt(entry)}
+                          className="text-xs font-medium text-zinc-900 underline underline-offset-2 hover:text-zinc-700 dark:text-zinc-50 dark:hover:text-zinc-300"
+                        >
+                          Descargar recibo
+                        </button>
+                      </div>
+                    )}
 
                     {isReporting && (
                       <div className="mt-3 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-black">

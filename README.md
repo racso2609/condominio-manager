@@ -4,7 +4,7 @@ Aplicación web para la gestión de condominios. Permite administrar edificios, 
 
 ## Características
 
-- **Autenticación** con Firebase Authentication (Google).
+- **Autenticación** con Supabase Auth (Google OAuth).
 - **Gestión de condominios**: crear, editar, completar registro y administrar edificios.
 - **Gestión de edificios y unidades**: generación automática de unidades, selección múltiple, duplicación de edificios.
 - **Residentes**: invitaciones individuales y grupales, reclamo de unidades, validación de propiedad y asignación manual por administradores.
@@ -20,12 +20,12 @@ Aplicación web para la gestión de condominios. Permite administrar edificios, 
 - [React](https://react.dev) 19
 - [TypeScript](https://www.typescriptlang.org)
 - [Tailwind CSS](https://tailwindcss.com) 4
-- [Firebase](https://firebase.google.com) (Authentication, Firestore, Storage)
+- [Supabase](https://supabase.com) (Auth, PostgreSQL, Storage)
 
 ## Requisitos previos
 
 - Node.js 20 o superior
-- Cuenta de Firebase con un proyecto configurado
+- Cuenta de Supabase con un proyecto configurado
 
 ## Configuración
 
@@ -35,20 +35,16 @@ Aplicación web para la gestión de condominios. Permite administrar edificios, 
 npm install
 ```
 
-2. Crea un archivo `.env.local` en la raíz del proyecto con la configuración de Firebase:
+2. Crea un archivo `.env.local` en la raíz del proyecto con la configuración de Supabase:
 
 ```env
-NEXT_PUBLIC_FIREBASE_API_KEY=tu_api_key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=tu_auth_domain
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=tu_project_id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=tu_storage_bucket
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=tu_messaging_sender_id
-NEXT_PUBLIC_FIREBASE_APP_ID=tu_app_id
+NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=tu_publishable_key
 ```
 
-3. Configura Firebase Authentication con el proveedor de Google.
+3. Configura Supabase Auth con el proveedor de Google.
 
-4. (Opcional) Configura Firestore Security Rules y Storage Rules según las necesidades del proyecto.
+4. (Opcional) Configura Row Level Security (RLS) y Storage Policies según las necesidades del proyecto.
 
 ## Ejecutar en desarrollo
 
@@ -66,17 +62,17 @@ npm run build
 
 ## Despliegue
 
-La aplicación puede desplegarse en cualquier plataforma que soporte Next.js, como [Vercel](https://vercel.com) o [Firebase App Hosting](https://firebase.google.com/docs/app-hosting).
+La aplicación puede desplegarse en cualquier plataforma que soporte Next.js, como [Vercel](https://vercel.com).
 
 ## Estructura del proyecto
 
 ```
 app/                    # Rutas y páginas de Next.js
 components/             # Componentes reutilizables
-lib/
-  services/             # Funciones de acceso a Firebase
+  lib/
+  services/             # Funciones de acceso a Supabase
   types.ts              # Tipos de TypeScript
-firebase.ts             # Configuración de Firebase
+supabase.ts             # Configuración de Supabase
 public/                 # Archivos estáticos
 ```
 
