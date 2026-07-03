@@ -121,7 +121,11 @@ export default function ProfilePage() {
           </h2>
           <div className="mt-3 flex items-center gap-4">
             <img
-              src={user.photoURL ?? undefined}
+              src={
+                user.user_metadata?.avatar_url ??
+                user.user_metadata?.picture ??
+                undefined
+              }
               alt=""
               className="h-14 w-14 rounded-full"
             />

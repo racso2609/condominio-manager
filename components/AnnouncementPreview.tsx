@@ -34,7 +34,7 @@ export default function AnnouncementPreview({
         </p>
         <p className="mt-1.5 text-[10px] text-zinc-400">
           {author?.name ?? ""} ·{" "}
-          {announcement.created_at.toDate().toLocaleDateString()}
+          {new Date(announcement.created_at).toLocaleDateString()}
         </p>
       </div>
     </Link>

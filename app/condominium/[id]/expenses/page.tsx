@@ -122,7 +122,7 @@ export default function ExpensesPage() {
                       {building
                         ? `${building.name} · `
                         : "Todo el condominio · "}
-                      Vence: {exp.due_date.toDate().toLocaleDateString()}
+                      Vence: {new Date(exp.due_date).toLocaleDateString()}
                     </p>
                   </div>
                   <div className="text-right">
@@ -145,8 +145,8 @@ export default function ExpensesPage() {
 
                 {exp.period_start && exp.period_end && (
                   <p className="mt-2 text-xs text-zinc-400">
-                    Período: {exp.period_start.toDate().toLocaleDateString()} —{" "}
-                    {exp.period_end.toDate().toLocaleDateString()}
+                    Período: {new Date(exp.period_start).toLocaleDateString()} —{" "}
+                    {new Date(exp.period_end).toLocaleDateString()}
                   </p>
                 )}
               </Link>

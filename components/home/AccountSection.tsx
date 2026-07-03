@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/Button";
-import { User } from "firebase/auth";
+import { User } from "@supabase/supabase-js";
 import { AppUser } from "@/lib/types";
 
 interface AccountSectionProps {
@@ -34,13 +34,20 @@ export function AccountSection({
           {user && (
             <>
               <img
-                src={user.photoURL ?? undefined}
+                src={
+                  user.user_metadata?.avatar_url ??
+                  user.user_metadata?.picture ??
+                  undefined
+                }
                 alt=""
                 className="h-10 w-10 rounded-full"
               />
               <div>
                 <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                  {appUser?.name ?? user.displayName}
+                  {appUser?.name ??
+                    user.user_metadata?.full_name ??
+                    user.user_metadata?.name ??
+                    "Usuario"}
                 </p>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
                   {appUser?.role === "admin"

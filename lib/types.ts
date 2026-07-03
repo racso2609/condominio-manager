@@ -1,5 +1,3 @@
-import { Timestamp } from "firebase/firestore";
-
 export interface AppUser {
   id: string;
   name: string;
@@ -7,8 +5,8 @@ export interface AppUser {
   phone?: string;
   role: "admin" | "user" | "administrator";
   photoURL?: string | null;
-  created_at: Timestamp;
-  updated_at: Timestamp;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Condominium {
@@ -17,8 +15,8 @@ export interface Condominium {
   address: string;
   creator: string;
   status: "draft" | "complete";
-  created_at: Timestamp;
-  updated_at: Timestamp;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CondominiumRole {
@@ -30,9 +28,9 @@ export interface CondominiumRole {
   invited_email?: string;
   invited_by?: string;
   token?: string;
-  expires_at?: Timestamp;
-  created_at: Timestamp;
-  updated_at: Timestamp;
+  expires_at?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Building {
@@ -41,8 +39,8 @@ export interface Building {
   name: string;
   symbol: string;
   address?: string;
-  created_at: Timestamp;
-  updated_at: Timestamp;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Unit {
@@ -53,9 +51,9 @@ export interface Unit {
   type: "residential" | "office";
   owner: string;
   owner_status?: "pending" | "verified";
-  claim_blocked_until?: Timestamp;
-  created_at: Timestamp;
-  updated_at: Timestamp;
+  claim_blocked_until?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Expense {
@@ -65,11 +63,11 @@ export interface Expense {
   title: string;
   description?: string;
   amount: number;
-  due_date: Timestamp;
-  period_start?: Timestamp;
-  period_end?: Timestamp;
-  created_at: Timestamp;
-  updated_at: Timestamp;
+  due_date: string;
+  period_start?: string;
+  period_end?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ExpenseEntry {
@@ -78,17 +76,17 @@ export interface ExpenseEntry {
   unit: string;
   amount: number;
   status: "pending" | "pending_validation" | "paid" | "overdue";
-  paid_at: Timestamp | null;
+  paid_at: string | null;
   payment_method_id?: string | null;
   payment_reference?: string | null;
   payment_proof_url?: string | null;
   notes?: string | null;
   reported_by?: string | null;
-  reported_at?: Timestamp | null;
+  reported_at?: string | null;
   validated_by?: string | null;
-  validated_at?: Timestamp | null;
-  created_at: Timestamp;
-  updated_at: Timestamp;
+  validated_at?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface AnnouncementFile {
@@ -104,8 +102,8 @@ export interface Announcement {
   content: string;
   files?: AnnouncementFile[];
   author: string;
-  created_at: Timestamp;
-  updated_at: Timestamp;
+  created_at: string;
+  updated_at: string;
 }
 
 export type PaymentMethodType =
@@ -131,8 +129,8 @@ export interface PaymentMethod {
   identification?: string;
   notes?: string;
   is_default: boolean;
-  created_at: Timestamp;
-  updated_at: Timestamp;
+  created_at: string;
+  updated_at: string;
 }
 
 export type ComplaintStatus = "pending" | "in_progress" | "resolved";
@@ -153,7 +151,7 @@ export interface Complaint {
   status: ComplaintStatus;
   resolution_notes?: string | null;
   resolved_by?: string | null;
-  resolved_at?: Timestamp | null;
-  created_at: Timestamp;
-  updated_at: Timestamp;
+  resolved_at?: string | null;
+  created_at: string;
+  updated_at: string;
 }

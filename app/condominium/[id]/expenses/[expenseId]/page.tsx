@@ -143,7 +143,7 @@ export default function ExpenseDetailPage() {
           {expense.title}
         </h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          {condominium.name} · Vence: {expense.due_date.toDate().toLocaleDateString()}
+          {condominium.name} · Vence: {new Date(expense.due_date).toLocaleDateString()}
         </p>
       </div>
 

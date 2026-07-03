@@ -85,7 +85,7 @@ export function ComplaintsSection({
                     <span>
                       {author?.name ?? ""}
                       {author ? " · " : ""}
-                      {complaint.created_at.toDate().toLocaleDateString()}
+                      {new Date(complaint.created_at).toLocaleDateString()}
                     </span>
                   </div>
                 </Link>

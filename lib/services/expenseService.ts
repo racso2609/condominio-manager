@@ -1,20 +1,11 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  Timestamp,
-  where,
-  orderBy,
-} from "firebase/firestore";
-import { db } from "@/firebase";
+import { supabase } from "@/lib/supabase";
 import { Expense } from "@/lib/types";
 
-const COLLECTION = "expenses";
+const TABLE = "expenses";
+
+function generateId(): string {
+  return crypto.randomUUID();
+}
 
 export async function createExpense(data: {
   condominium?: string;
@@ -26,54 +17,63 @@ export async function createExpense(data: {
   period_start?: Date;
   period_end?: Date;
 }): Promise<Expense> {
-  const now = Timestamp.now();
-  const ref = doc(collection(db, COLLECTION));
+  const now = new Date().toISOString();
+  const id = generateId();
   const expenseData = {
+    id,
     condominium: data.condominium ?? null,
     building: data.building ?? null,
     title: data.title,
     description: data.description ?? null,
     amount: data.amount,
-    due_date: Timestamp.fromDate(data.due_date),
-    period_start: data.period_start ? Timestamp.fromDate(data.period_start) : null,
-    period_end: data.period_end ? Timestamp.fromDate(data.period_end) : null,
+    due_date: data.due_date.toISOString(),
+    period_start: data.period_start ? data.period_start.toISOString() : null,
+    period_end: data.period_end ? data.period_end.toISOString() : null,
     created_at: now,
     updated_at: now,
   };
-  await setDoc(ref, expenseData);
-  return { id: ref.id, ...expenseData } as unknown as Expense;
+
+  const { error } = await supabase.from(TABLE).insert(expenseData);
+  if (error) throw error;
+
+  return expenseData as unknown as Expense;
 }
 
 export async function getExpense(id: string): Promise<Expense | null> {
-  const snap = await getDoc(doc(db, COLLECTION, id));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() } as Expense;
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) return null;
+  return data as Expense;
 }
 
 export async function getExpensesByCondominium(
   condominiumId: string
 ): Promise<Expense[]> {
-  const snapshot = await getDocs(
-    query(
-      collection(db, COLLECTION),
-      where("condominium", "==", condominiumId),
-      orderBy("created_at", "desc")
-    )
-  );
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Expense);
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("condominium", condominiumId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as Expense[];
 }
 
 export async function getExpensesByBuilding(
   buildingId: string
 ): Promise<Expense[]> {
-  const snapshot = await getDocs(
-    query(
-      collection(db, COLLECTION),
-      where("building", "==", buildingId),
-      orderBy("created_at", "desc")
-    )
-  );
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Expense);
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("building", buildingId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as Expense[];
 }
 
 export async function updateExpense(
@@ -87,16 +87,26 @@ export async function updateExpense(
     period_end: Date;
   }>
 ): Promise<void> {
-  const updateData: Record<string, unknown> = { updated_at: Timestamp.now() };
+  const updateData: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+
   if (data.title !== undefined) updateData.title = data.title;
   if (data.description !== undefined) updateData.description = data.description;
   if (data.amount !== undefined) updateData.amount = data.amount;
-  if (data.due_date !== undefined) updateData.due_date = Timestamp.fromDate(data.due_date);
-  if (data.period_start !== undefined) updateData.period_start = Timestamp.fromDate(data.period_start);
-  if (data.period_end !== undefined) updateData.period_end = Timestamp.fromDate(data.period_end);
-  await updateDoc(doc(db, COLLECTION, id), updateData);
+  if (data.due_date !== undefined) updateData.due_date = data.due_date.toISOString();
+  if (data.period_start !== undefined) {
+    updateData.period_start = data.period_start.toISOString();
+  }
+  if (data.period_end !== undefined) {
+    updateData.period_end = data.period_end.toISOString();
+  }
+
+  const { error } = await supabase.from(TABLE).update(updateData).eq("id", id);
+  if (error) throw error;
 }
 
 export async function deleteExpense(id: string): Promise<void> {
-  await deleteDoc(doc(db, COLLECTION, id));
+  const { error } = await supabase.from(TABLE).delete().eq("id", id);
+  if (error) throw error;
 }

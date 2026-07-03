@@ -1,55 +1,55 @@
-import {
-  collection,
-  doc,
-  deleteDoc,
-  getDoc,
-  getDocs,
-  query,
-  where,
-  documentId,
-  Timestamp,
-  setDoc,
-  updateDoc,
-} from "firebase/firestore";
-import { db } from "@/firebase";
+import { supabase } from "@/lib/supabase";
 import { Condominium, CondominiumRole } from "@/lib/types";
 
-const CONDO_COLLECTION = "condominiums";
-const ROLE_COLLECTION = "condominium_roles";
+const CONDO_TABLE = "condominiums";
+const ROLE_TABLE = "condominium_roles";
+
+function generateId(): string {
+  return crypto.randomUUID();
+}
+
+function generateToken(): string {
+  return crypto.randomUUID();
+}
 
 export async function getUserCondominiums(
   userId: string,
   role: string
 ): Promise<Condominium[]> {
   if (role === "admin") {
-    const snapshot = await getDocs(collection(db, CONDO_COLLECTION));
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Condominium));
+    const { data, error } = await supabase.from(CONDO_TABLE).select("*");
+    if (error) throw error;
+    return (data ?? []) as Condominium[];
   }
 
-  const rolesSnapshot = await getDocs(
-    query(collection(db, ROLE_COLLECTION), where("user", "==", userId))
-  );
+  const { data: roles, error: rolesError } = await supabase
+    .from(ROLE_TABLE)
+    .select("condominium")
+    .eq("user", userId);
 
-  if (rolesSnapshot.empty) return [];
+  if (rolesError) throw rolesError;
+  if (!roles || roles.length === 0) return [];
 
-  const condominiumIds = rolesSnapshot.docs.map((d) => d.data().condominium);
+  const condominiumIds = Array.from(new Set(roles.map((r) => r.condominium)));
 
-  if (condominiumIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from(CONDO_TABLE)
+    .select("*")
+    .in("id", condominiumIds);
 
-  const condoSnapshot = await getDocs(
-    query(
-      collection(db, CONDO_COLLECTION),
-      where(documentId(), "in", condominiumIds)
-    )
-  );
-
-  return condoSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Condominium));
+  if (error) throw error;
+  return (data ?? []) as Condominium[];
 }
 
 export async function getCondominium(id: string): Promise<Condominium | null> {
-  const snap = await getDoc(doc(db, CONDO_COLLECTION, id));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() } as Condominium;
+  const { data, error } = await supabase
+    .from(CONDO_TABLE)
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) return null;
+  return data as Condominium;
 }
 
 export async function createCondominium(data: {
@@ -57,9 +57,10 @@ export async function createCondominium(data: {
   address: string;
   creator: string;
 }): Promise<Condominium> {
-  const now = Timestamp.now();
-  const ref = doc(collection(db, CONDO_COLLECTION));
+  const now = new Date().toISOString();
+  const condoId = generateId();
   const condoData = {
+    id: condoId,
     name: data.name,
     address: data.address,
     creator: data.creator,
@@ -67,155 +68,175 @@ export async function createCondominium(data: {
     created_at: now,
     updated_at: now,
   };
-  await setDoc(ref, condoData);
 
-  await setDoc(doc(collection(db, ROLE_COLLECTION)), {
-    condominium: ref.id,
+  const { error: condoError } = await supabase.from(CONDO_TABLE).insert(condoData);
+  if (condoError) throw condoError;
+
+  const { error: roleError } = await supabase.from(ROLE_TABLE).insert({
+    id: generateId(),
+    condominium: condoId,
     user: data.creator,
     role: "administrator",
     status: "verified",
     created_at: now,
     updated_at: now,
   });
+  if (roleError) throw roleError;
 
-  return { id: ref.id, ...condoData };
+  return condoData as Condominium;
 }
 
 export async function getCondominiumRoles(condominiumId: string): Promise<CondominiumRole[]> {
-  const snapshot = await getDocs(
-    query(collection(db, ROLE_COLLECTION), where("condominium", "==", condominiumId))
-  );
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as CondominiumRole));
+  const { data, error } = await supabase
+    .from(ROLE_TABLE)
+    .select("*")
+    .eq("condominium", condominiumId);
+
+  if (error) throw error;
+  return (data ?? []) as CondominiumRole[];
 }
 
 export async function getUserCondominiumRole(
-  userId: string,
-  condominiumId: string,
+  userId: string | undefined,
+  condominiumId: string
 ): Promise<CondominiumRole | null> {
-  const snapshot = await getDocs(
-    query(
-      collection(db, ROLE_COLLECTION),
-      where("condominium", "==", condominiumId),
-      where("user", "==", userId),
-    )
-  );
-  if (snapshot.empty) return null;
-  return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as CondominiumRole;
-}
+  if (!userId) return null;
+  const { data, error } = await supabase
+    .from(ROLE_TABLE)
+    .select("*")
+    .eq("condominium", condominiumId)
+    .eq("user", userId)
+    .single();
 
-function generateToken(): string {
-  return crypto.randomUUID();
+  if (error || !data) return null;
+  return data as CondominiumRole;
 }
 
 export async function createInvite(
   condominiumId: string,
   invitedBy: string,
-  email: string,
+  email: string
 ): Promise<CondominiumRole> {
-  const existingSnapshot = await getDocs(
-    query(
-      collection(db, ROLE_COLLECTION),
-      where("condominium", "==", condominiumId),
-      where("invited_email", "==", email),
-      where("user", "==", ""),
-    )
-  );
-  if (!existingSnapshot.empty) {
+  const { data: existing, error: existingError } = await supabase
+    .from(ROLE_TABLE)
+    .select("*")
+    .eq("condominium", condominiumId)
+    .eq("invited_email", email)
+    .is("user", null);
+
+  if (existingError) throw existingError;
+  if (existing && existing.length > 0) {
     throw new Error("Ya existe una invitación pendiente para este correo");
   }
 
-  const now = Timestamp.now();
+  const now = new Date().toISOString();
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);
-  const ref = doc(collection(db, ROLE_COLLECTION));
+
   const roleData = {
+    id: generateId(),
     condominium: condominiumId,
-    user: "",
+    user: null as string | null,
     role: "resident" as const,
     status: "pending" as const,
     invited_email: email,
     invited_by: invitedBy,
     token: generateToken(),
-    expires_at: Timestamp.fromDate(expiresAt),
+    expires_at: expiresAt.toISOString(),
     created_at: now,
     updated_at: now,
   };
-  await setDoc(ref, roleData);
-  return { id: ref.id, ...roleData };
+
+  const { error } = await supabase.from(ROLE_TABLE).insert(roleData);
+  if (error) throw error;
+
+  return roleData as unknown as CondominiumRole;
 }
 
 export async function createGlobalInvite(
   condominiumId: string,
-  invitedBy: string,
+  invitedBy: string
 ): Promise<CondominiumRole> {
-  const now = Timestamp.now();
+  const now = new Date().toISOString();
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);
-  const ref = doc(collection(db, ROLE_COLLECTION));
+
   const roleData = {
+    id: generateId(),
     condominium: condominiumId,
-    user: "",
+    user: null as string | null,
     role: "resident" as const,
     status: "pending" as const,
     invited_by: invitedBy,
     token: generateToken(),
-    expires_at: Timestamp.fromDate(expiresAt),
+    expires_at: expiresAt.toISOString(),
     created_at: now,
     updated_at: now,
   };
-  await setDoc(ref, roleData);
-  return { id: ref.id, ...roleData };
+
+  const { error } = await supabase.from(ROLE_TABLE).insert(roleData);
+  if (error) throw error;
+
+  return roleData as unknown as CondominiumRole;
 }
 
 export async function getInviteByToken(token: string): Promise<CondominiumRole | null> {
-  const snapshot = await getDocs(
-    query(collection(db, ROLE_COLLECTION), where("token", "==", token))
-  );
-  if (snapshot.empty) return null;
-  const doc = snapshot.docs[0];
-  return { id: doc.id, ...doc.data() } as CondominiumRole;
+  const { data, error } = await supabase
+    .from(ROLE_TABLE)
+    .select("*")
+    .eq("token", token)
+    .single();
+
+  if (error || !data) return null;
+  return data as CondominiumRole;
 }
 
 export async function acceptInvite(token: string, userId: string): Promise<CondominiumRole> {
   const role = await getInviteByToken(token);
   if (!role) throw new Error("Invitación no encontrada");
-  if (role.expires_at && role.expires_at.toMillis() < Date.now())
+  if (role.expires_at && new Date(role.expires_at).getTime() < Date.now()) {
     throw new Error("Invitación expirada");
+  }
+
+  const now = new Date().toISOString();
 
   if (role.invited_email) {
     if (role.user) throw new Error("Invitación ya fue aceptada");
 
-    const existingSnapshot = await getDocs(
-      query(
-        collection(db, ROLE_COLLECTION),
-        where("condominium", "==", role.condominium),
-        where("user", "==", userId),
-      )
-    );
-    if (!existingSnapshot.empty) {
+    const { data: existing, error: existingError } = await supabase
+      .from(ROLE_TABLE)
+      .select("*")
+      .eq("condominium", role.condominium)
+      .eq("user", userId);
+
+    if (existingError) throw existingError;
+    if (existing && existing.length > 0) {
       throw new Error("Ya eres parte de este condominio");
     }
 
-    const ref = doc(db, ROLE_COLLECTION, role.id);
-    await updateDoc(ref, { user: userId, updated_at: Timestamp.now() });
-    return { ...role, user: userId, updated_at: Timestamp.now() };
+    const { error } = await supabase
+      .from(ROLE_TABLE)
+      .update({ user: userId, updated_at: now })
+      .eq("id", role.id);
+
+    if (error) throw error;
+    return { ...role, user: userId, updated_at: now };
   }
 
   // Global invite: create a new role for this user without consuming the token.
-  const existingSnapshot = await getDocs(
-    query(
-      collection(db, ROLE_COLLECTION),
-      where("condominium", "==", role.condominium),
-      where("user", "==", userId),
-    )
-  );
-  if (!existingSnapshot.empty) {
+  const { data: existing, error: existingError } = await supabase
+    .from(ROLE_TABLE)
+    .select("*")
+    .eq("condominium", role.condominium)
+    .eq("user", userId);
+
+  if (existingError) throw existingError;
+  if (existing && existing.length > 0) {
     throw new Error("Ya eres parte de este condominio");
   }
 
-  const now = Timestamp.now();
-  const newRef = doc(collection(db, ROLE_COLLECTION));
   const newRoleData = {
+    id: generateId(),
     condominium: role.condominium,
     user: userId,
     role: "resident" as const,
@@ -224,49 +245,57 @@ export async function acceptInvite(token: string, userId: string): Promise<Condo
     created_at: now,
     updated_at: now,
   };
-  await setDoc(newRef, newRoleData);
-  return { id: newRef.id, ...newRoleData };
+
+  const { error } = await supabase.from(ROLE_TABLE).insert(newRoleData);
+  if (error) throw error;
+
+  return newRoleData as CondominiumRole;
 }
 
 export async function getPendingInvitesByEmail(email: string): Promise<CondominiumRole[]> {
-  const snapshot = await getDocs(
-    query(
-      collection(db, ROLE_COLLECTION),
-      where("invited_email", "==", email),
-      where("user", "==", ""),
-    )
-  );
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as CondominiumRole));
+  const { data, error } = await supabase
+    .from(ROLE_TABLE)
+    .select("*")
+    .eq("invited_email", email)
+    .is("user", null);
+
+  if (error) throw error;
+  return (data ?? []) as CondominiumRole[];
 }
 
 export async function getPendingRoles(condominiumId: string): Promise<CondominiumRole[]> {
-  const snapshot = await getDocs(
-    query(
-      collection(db, ROLE_COLLECTION),
-      where("condominium", "==", condominiumId),
-      where("status", "==", "pending"),
-    )
-  );
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as CondominiumRole));
+  const { data, error } = await supabase
+    .from(ROLE_TABLE)
+    .select("*")
+    .eq("condominium", condominiumId)
+    .eq("status", "pending");
+
+  if (error) throw error;
+  return (data ?? []) as CondominiumRole[];
 }
 
 export async function verifyRole(roleId: string): Promise<void> {
-  await updateDoc(doc(db, ROLE_COLLECTION, roleId), {
-    status: "verified",
-    updated_at: Timestamp.now(),
-  });
+  const { error } = await supabase
+    .from(ROLE_TABLE)
+    .update({ status: "verified", updated_at: new Date().toISOString() })
+    .eq("id", roleId);
+
+  if (error) throw error;
 }
 
 export async function deleteCondominiumRole(roleId: string): Promise<void> {
-  await deleteDoc(doc(db, ROLE_COLLECTION, roleId));
+  const { error } = await supabase.from(ROLE_TABLE).delete().eq("id", roleId);
+  if (error) throw error;
 }
 
 export async function updateCondominiumStatus(
   id: string,
-  status: "draft" | "complete",
+  status: "draft" | "complete"
 ): Promise<void> {
-  await updateDoc(doc(db, CONDO_COLLECTION, id), {
-    status,
-    updated_at: Timestamp.now(),
-  });
+  const { error } = await supabase
+    .from(CONDO_TABLE)
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) throw error;
 }

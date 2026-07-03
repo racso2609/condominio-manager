@@ -373,7 +373,7 @@ export default function BuildingDetail() {
                           </span>
                         )}
                         {u.claim_blocked_until &&
-                          u.claim_blocked_until.toMillis() > Date.now() && (
+                          new Date(u.claim_blocked_until).getTime() > Date.now() && (
                             <span className="ml-auto text-[10px] text-red-400">
                               Bloqueada
                             </span>
@@ -382,7 +382,7 @@ export default function BuildingDetail() {
                           appUser &&
                           !(
                             u.claim_blocked_until &&
-                            u.claim_blocked_until.toMillis() > Date.now()
+                            new Date(u.claim_blocked_until).getTime() > Date.now()
                           ) && (
                             <button
                               onClick={() => handleClaim(u.id)}

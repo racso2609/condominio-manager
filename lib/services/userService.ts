@@ -1,44 +1,73 @@
-import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, Timestamp, where } from "firebase/firestore";
-import { db } from "@/firebase";
+import { supabase } from "@/lib/supabase";
 import { AppUser } from "@/lib/types";
 
-const COLLECTION = "users";
+const TABLE = "users";
 
 export async function getUser(id: string): Promise<AppUser | null> {
-  const snap = await getDoc(doc(db, COLLECTION, id));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() } as AppUser;
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) return null;
+  return data as AppUser;
 }
 
 export async function createUser(
   id: string,
   data: { name: string; email: string; photoURL?: string | null }
 ): Promise<AppUser> {
-  const now = Timestamp.now();
+  const now = new Date().toISOString();
   const userData = {
+    id,
     name: data.name,
     email: data.email,
-    photoURL: data.photoURL ?? null,
+    photo_url: data.photoURL ?? null,
     role: "user" as const,
     created_at: now,
     updated_at: now,
   };
-  await setDoc(doc(db, COLLECTION, id), userData);
-  return { id, ...userData };
+
+  const { error } = await supabase.from(TABLE).insert(userData);
+  if (error) throw error;
+
+  return {
+    id,
+    name: data.name,
+    email: data.email,
+    photoURL: data.photoURL ?? null,
+    role: "user",
+    created_at: now,
+    updated_at: now,
+  } as AppUser;
 }
 
 export async function updateUser(
   id: string,
   data: Partial<Pick<AppUser, "name" | "photoURL" | "role" | "phone">>
 ): Promise<void> {
-  await updateDoc(doc(db, COLLECTION, id), { ...data, updated_at: Timestamp.now() });
+  const mapped: Record<string, unknown> = {};
+  if (data.name !== undefined) mapped.name = data.name;
+  if (data.photoURL !== undefined) mapped.photo_url = data.photoURL;
+  if (data.role !== undefined) mapped.role = data.role;
+  if (data.phone !== undefined) mapped.phone = data.phone;
+
+  const { error } = await supabase
+    .from(TABLE)
+    .update({ ...mapped, updated_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) throw error;
 }
 
 export async function getUserByEmail(email: string): Promise<AppUser | null> {
-  const snapshot = await getDocs(
-    query(collection(db, COLLECTION), where("email", "==", email))
-  );
-  if (snapshot.empty) return null;
-  const doc = snapshot.docs[0];
-  return { id: doc.id, ...doc.data() } as AppUser;
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("email", email)
+    .single();
+
+  if (error || !data) return null;
+  return data as AppUser;
 }

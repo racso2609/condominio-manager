@@ -1,21 +1,59 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  Timestamp,
-  where,
-  orderBy,
-} from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import { db, storage } from "@/firebase";
+import { supabase } from "@/lib/supabase";
+import { generateStorageFileName } from "@/lib/utils/storage";
 import { Complaint, ComplaintFile, ComplaintStatus } from "@/lib/types";
 
-const COLLECTION = "complaints";
+const TABLE = "complaints";
+const STORAGE_BUCKET = "condominios";
+
+function generateId(): string {
+  return crypto.randomUUID();
+}
+
+async function uploadFiles(
+  files: File[],
+  pathPrefix: string
+): Promise<ComplaintFile[]> {
+  const uploaded: ComplaintFile[] = [];
+
+  for (const file of files) {
+    const path = `${pathPrefix}/${generateStorageFileName(file.name)}`;
+    const { error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(path, file, { upsert: true });
+
+    if (error) throw error;
+
+    const { data: publicUrlData } = supabase.storage
+      .from(STORAGE_BUCKET)
+      .getPublicUrl(path);
+
+    uploaded.push({
+      name: file.name,
+      url: publicUrlData.publicUrl,
+      type: file.type.startsWith("image/") ? "image" : "document",
+    });
+  }
+
+  return uploaded;
+}
+
+function getStoragePathFromPublicUrl(publicUrl: string): string | null {
+  const marker = `/object/public/${STORAGE_BUCKET}/`;
+  const index = publicUrl.indexOf(marker);
+  if (index === -1) return null;
+  return publicUrl.slice(index + marker.length);
+}
+
+async function deleteFiles(files: ComplaintFile[]): Promise<void> {
+  const paths = files
+    .map((f) => getStoragePathFromPublicUrl(f.url))
+    .filter((p): p is string => p !== null);
+  if (paths.length === 0) return;
+  const { error } = await supabase.storage.from(STORAGE_BUCKET).remove(paths);
+  if (error) {
+    console.warn("Failed to delete some complaint files:", error);
+  }
+}
 
 export async function createComplaint(data: {
   condominium: string;
@@ -24,77 +62,76 @@ export async function createComplaint(data: {
   author: string;
   files?: File[];
 }): Promise<Complaint> {
-  const now = Timestamp.now();
-  const ref_doc = doc(collection(db, COLLECTION));
+  const now = new Date().toISOString();
+  const id = generateId();
+
+  // Upload files first so the complaint is only created if uploads succeed.
+  const uploadedFiles =
+    data.files && data.files.length > 0
+      ? await uploadFiles(data.files, `complaints/${data.condominium}/${id}`)
+      : [];
+
   const complaintData = {
+    id,
     condominium: data.condominium,
     title: data.title,
     content: data.content,
     author: data.author,
-    files: [] as ComplaintFile[],
+    files: uploadedFiles,
     status: "pending" as ComplaintStatus,
     created_at: now,
     updated_at: now,
   };
-  await setDoc(ref_doc, complaintData);
 
-  if (data.files && data.files.length > 0) {
-    const uploaded: ComplaintFile[] = [];
-    for (const file of data.files) {
-      const storageRef = ref(
-        storage,
-        `complaints/${data.condominium}/${ref_doc.id}/${file.name}`
-      );
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      uploaded.push({
-        name: file.name,
-        url,
-        type: file.type.startsWith("image/") ? "image" : "document",
-      });
+  const { error } = await supabase.from(TABLE).insert(complaintData);
+  if (error) {
+    // Best-effort cleanup of uploaded files if the complaint insert fails.
+    if (uploadedFiles.length > 0) {
+      await deleteFiles(uploadedFiles);
     }
-    await updateDoc(ref_doc, {
-      files: uploaded,
-      updated_at: Timestamp.now(),
-    });
-    complaintData.files = uploaded;
+    throw error;
   }
 
-  return { id: ref_doc.id, ...complaintData };
+  return complaintData as Complaint;
 }
 
 export async function getComplaintsByCondominium(
   condominiumId: string
 ): Promise<Complaint[]> {
-  const snapshot = await getDocs(
-    query(
-      collection(db, COLLECTION),
-      where("condominium", "==", condominiumId),
-      orderBy("created_at", "desc")
-    )
-  );
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Complaint);
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("condominium", condominiumId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as Complaint[];
 }
 
 export async function getComplaintsByAuthor(
   condominiumId: string,
   authorId: string
 ): Promise<Complaint[]> {
-  const snapshot = await getDocs(
-    query(
-      collection(db, COLLECTION),
-      where("condominium", "==", condominiumId),
-      where("author", "==", authorId),
-      orderBy("created_at", "desc")
-    )
-  );
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Complaint);
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("condominium", condominiumId)
+    .eq("author", authorId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as Complaint[];
 }
 
 export async function getComplaint(id: string): Promise<Complaint | null> {
-  const snap = await getDoc(doc(db, COLLECTION, id));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() } as Complaint;
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) return null;
+  return data as Complaint;
 }
 
 export async function updateComplaintStatus(
@@ -103,14 +140,15 @@ export async function updateComplaintStatus(
   resolverId?: string,
   resolutionNotes?: string
 ): Promise<void> {
+  const now = new Date().toISOString();
   const payload: Record<string, unknown> = {
     status,
-    updated_at: Timestamp.now(),
+    updated_at: now,
   };
 
   if (status === "resolved") {
     payload.resolved_by = resolverId ?? null;
-    payload.resolved_at = Timestamp.now();
+    payload.resolved_at = now;
     payload.resolution_notes = resolutionNotes?.trim() ?? null;
   } else {
     payload.resolved_by = null;
@@ -118,26 +156,17 @@ export async function updateComplaintStatus(
     payload.resolution_notes = null;
   }
 
-  await updateDoc(doc(db, COLLECTION, id), payload);
+  const { error } = await supabase.from(TABLE).update(payload).eq("id", id);
+  if (error) throw error;
 }
 
-export async function deleteComplaint(
-  id: string,
-  condominiumId: string
-): Promise<void> {
+export async function deleteComplaint(id: string): Promise<string> {
   const complaint = await getComplaint(id);
-  if (complaint?.files) {
-    for (const f of complaint.files) {
-      try {
-        const storageRef = ref(
-          storage,
-          `complaints/${condominiumId}/${id}/${f.name}`
-        );
-        await deleteObject(storageRef);
-      } catch {
-        // file may not exist
-      }
-    }
+  if (complaint?.files && complaint.files.length > 0) {
+    await deleteFiles(complaint.files);
   }
-  await deleteDoc(doc(db, COLLECTION, id));
+
+  const { error } = await supabase.from(TABLE).delete().eq("id", id);
+  if (error) throw error;
+  return id;
 }

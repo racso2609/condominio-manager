@@ -57,7 +57,7 @@ export default function AnnouncementsPage() {
     )
       return;
 
-    deleteAnnouncement({ id: announcement.id, condominiumId });
+    deleteAnnouncement(announcement.id);
   };
 
   const loading = condominiumLoading || announcementsLoading;
@@ -130,7 +130,7 @@ export default function AnnouncementsPage() {
                     </h2>
                     <p className="mt-1 text-xs text-zinc-500">
                       {author?.name ?? "Desconocido"} ·{" "}
-                      {ann.created_at.toDate().toLocaleDateString()}
+                      {new Date(ann.created_at).toLocaleDateString()}
                     </p>
                   </div>
                   {isAdminOrManager && (

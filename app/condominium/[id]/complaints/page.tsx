@@ -161,7 +161,7 @@ export default function ComplaintsPage() {
     )
       return;
 
-    deleteComplaint({ id: complaint.id, condominiumId });
+    deleteComplaint(complaint.id);
   };
 
   const loading =
@@ -255,7 +255,7 @@ export default function ComplaintsPage() {
                       {[
                         author?.name ?? "Desconocido",
                         unitsText,
-                        complaint.created_at.toDate().toLocaleDateString(),
+                        new Date(complaint.created_at).toLocaleDateString(),
                       ]
                         .filter(Boolean)
                         .join(" · ")}

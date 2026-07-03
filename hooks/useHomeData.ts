@@ -110,7 +110,7 @@ export function useHomeData(appUser: AppUser | undefined): UseHomeDataResult {
       if (q.data) items.push(...q.data);
     });
     return items.sort(
-      (a, b) => b.created_at.toMillis() - a.created_at.toMillis()
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
   }, [announcementsQueries]);
 
@@ -120,7 +120,7 @@ export function useHomeData(appUser: AppUser | undefined): UseHomeDataResult {
       if (q.data) items.push(...q.data);
     });
     return items.sort(
-      (a, b) => b.created_at.toMillis() - a.created_at.toMillis()
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
   }, [complaintsQueries]);
 

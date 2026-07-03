@@ -1,10 +1,13 @@
-import { collection, doc, getDoc, getDocs, query, setDoc, Timestamp, updateDoc, deleteDoc, where } from "firebase/firestore";
-import { db } from "@/firebase";
+import { supabase } from "@/lib/supabase";
 import { Building, Unit } from "@/lib/types";
 import { getUnitsByBuilding } from "@/lib/services/unitService";
 
-const COLLECTION = "buildings";
-const UNITS_COLLECTION = "units";
+const TABLE = "buildings";
+const UNITS_TABLE = "units";
+
+function generateId(): string {
+  return crypto.randomUUID();
+}
 
 export async function createBuilding(data: {
   condominium: string;
@@ -12,9 +15,10 @@ export async function createBuilding(data: {
   symbol: string;
   address?: string;
 }): Promise<Building> {
-  const now = Timestamp.now();
-  const ref = doc(collection(db, COLLECTION));
+  const now = new Date().toISOString();
+  const id = generateId();
   const buildingData = {
+    id,
     condominium: data.condominium,
     name: data.name,
     symbol: data.symbol,
@@ -22,46 +26,64 @@ export async function createBuilding(data: {
     created_at: now,
     updated_at: now,
   };
-  await setDoc(ref, buildingData);
-  return { id: ref.id, ...buildingData };
+
+  const { error } = await supabase.from(TABLE).insert(buildingData);
+  if (error) throw error;
+
+  return buildingData as Building;
 }
 
 export async function getBuilding(id: string): Promise<Building | null> {
-  const snap = await getDoc(doc(db, COLLECTION, id));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() } as Building;
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) return null;
+  return data as Building;
 }
 
 export async function updateBuilding(
   id: string,
   data: { name: string; symbol: string; address?: string }
 ): Promise<void> {
-  await updateDoc(doc(db, COLLECTION, id), {
-    name: data.name,
-    symbol: data.symbol,
-    address: data.address ?? "",
-    updated_at: Timestamp.now(),
-  });
+  const { error } = await supabase
+    .from(TABLE)
+    .update({
+      name: data.name,
+      symbol: data.symbol,
+      address: data.address ?? "",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) throw error;
 }
 
 export async function deleteBuilding(id: string): Promise<void> {
-  await deleteDoc(doc(db, COLLECTION, id));
+  const { error } = await supabase.from(TABLE).delete().eq("id", id);
+  if (error) throw error;
 }
 
 export async function getBuildingsByCondominium(condominiumId: string): Promise<Building[]> {
-  const snapshot = await getDocs(
-    query(collection(db, COLLECTION), where("condominium", "==", condominiumId))
-  );
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Building));
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("condominium", condominiumId);
+
+  if (error) throw error;
+  return (data ?? []) as Building[];
 }
 
 export async function duplicateBuilding(
   sourceBuildingId: string,
   data: { condominium: string; name: string; symbol: string; address?: string }
 ): Promise<Building> {
-  const now = Timestamp.now();
-  const buildingRef = doc(collection(db, COLLECTION));
+  const now = new Date().toISOString();
+  const buildingId = generateId();
   const buildingData = {
+    id: buildingId,
     condominium: data.condominium,
     name: data.name,
     symbol: data.symbol,
@@ -69,21 +91,26 @@ export async function duplicateBuilding(
     created_at: now,
     updated_at: now,
   };
-  await setDoc(buildingRef, buildingData);
+
+  const { error: buildingError } = await supabase.from(TABLE).insert(buildingData);
+  if (buildingError) throw buildingError;
 
   const sourceUnits = await getUnitsByBuilding(sourceBuildingId);
-  for (const unit of sourceUnits) {
-    const unitRef = doc(collection(db, UNITS_COLLECTION));
-    await setDoc(unitRef, {
-      building: buildingRef.id,
-      num: unit.num,
-      floor: unit.floor,
-      type: unit.type,
-      owner: "",
-      created_at: now,
-      updated_at: now,
-    });
+  const newUnits: Unit[] = sourceUnits.map((unit) => ({
+    id: generateId(),
+    building: buildingId,
+    num: unit.num,
+    floor: unit.floor,
+    type: unit.type,
+    owner: "",
+    created_at: now,
+    updated_at: now,
+  }));
+
+  if (newUnits.length > 0) {
+    const { error: unitsError } = await supabase.from(UNITS_TABLE).insert(newUnits);
+    if (unitsError) throw unitsError;
   }
 
-  return { id: buildingRef.id, ...buildingData };
+  return buildingData as Building;
 }

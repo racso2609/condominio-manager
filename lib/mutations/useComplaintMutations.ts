@@ -49,19 +49,13 @@ export function useDeleteComplaint() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      id,
-      condominiumId,
-    }: {
-      id: string;
-      condominiumId: string;
-    }) => deleteComplaint(id, condominiumId),
-    onSuccess: (_, variables) => {
+    mutationFn: deleteComplaint,
+    onSuccess: (id) => {
       queryClient.invalidateQueries({
-        queryKey: queryKeys.complaints.byCondominium(variables.condominiumId),
+        queryKey: queryKeys.complaints.all(),
       });
       queryClient.invalidateQueries({
-        queryKey: queryKeys.complaints.detail(variables.id),
+        queryKey: queryKeys.complaints.detail(id),
       });
     },
   });

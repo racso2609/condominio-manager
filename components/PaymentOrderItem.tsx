@@ -64,7 +64,7 @@ export default function PaymentOrderItem({
           </p>
           {expense?.due_date && (
             <p className="mt-0.5 text-xs text-zinc-400">
-              Vence: {expense.due_date.toDate().toLocaleDateString()}
+              Vence: {new Date(expense.due_date).toLocaleDateString()}
             </p>
           )}
         </div>

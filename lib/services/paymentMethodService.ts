@@ -1,21 +1,11 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  Timestamp,
-  writeBatch,
-} from "firebase/firestore";
-import { db } from "@/firebase";
+import { supabase } from "@/lib/supabase";
 import { PaymentMethod, PaymentMethodType } from "@/lib/types";
 
-const COLLECTION = "payment_methods";
+const TABLE = "payment_methods";
+
+function generateId(): string {
+  return crypto.randomUUID();
+}
 
 export interface CreatePaymentMethodInput {
   condominium: string;
@@ -35,9 +25,10 @@ export interface CreatePaymentMethodInput {
 export async function createPaymentMethod(
   data: CreatePaymentMethodInput
 ): Promise<PaymentMethod> {
-  const now = Timestamp.now();
-  const ref = doc(collection(db, COLLECTION));
+  const now = new Date().toISOString();
+  const id = generateId();
   const paymentMethodData = {
+    id,
     condominium: data.condominium,
     name: data.name.trim(),
     type: data.type,
@@ -58,27 +49,34 @@ export async function createPaymentMethod(
     await unsetDefaultPaymentMethods(data.condominium);
   }
 
-  await setDoc(ref, paymentMethodData);
-  return { id: ref.id, ...paymentMethodData } as unknown as PaymentMethod;
+  const { error } = await supabase.from(TABLE).insert(paymentMethodData);
+  if (error) throw error;
+
+  return paymentMethodData as unknown as PaymentMethod;
 }
 
 export async function getPaymentMethod(id: string): Promise<PaymentMethod | null> {
-  const snap = await getDoc(doc(db, COLLECTION, id));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() } as PaymentMethod;
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) return null;
+  return data as PaymentMethod;
 }
 
 export async function getPaymentMethodsByCondominium(
   condominiumId: string
 ): Promise<PaymentMethod[]> {
-  const snapshot = await getDocs(
-    query(
-      collection(db, COLLECTION),
-      where("condominium", "==", condominiumId),
-      orderBy("created_at", "desc")
-    )
-  );
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as PaymentMethod);
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("condominium", condominiumId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as PaymentMethod[];
 }
 
 export async function updatePaymentMethod(
@@ -86,7 +84,9 @@ export async function updatePaymentMethod(
   condominiumId: string,
   data: Partial<CreatePaymentMethodInput>
 ): Promise<void> {
-  const updateData: Record<string, unknown> = { updated_at: Timestamp.now() };
+  const updateData: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
 
   if (data.name !== undefined) updateData.name = data.name.trim();
   if (data.type !== undefined) updateData.type = data.type;
@@ -109,33 +109,37 @@ export async function updatePaymentMethod(
     await unsetDefaultPaymentMethods(condominiumId, id);
   }
 
-  await updateDoc(doc(db, COLLECTION, id), updateData);
+  const { error } = await supabase.from(TABLE).update(updateData).eq("id", id);
+  if (error) throw error;
 }
 
 export async function deletePaymentMethod(id: string): Promise<void> {
-  await deleteDoc(doc(db, COLLECTION, id));
+  const { error } = await supabase.from(TABLE).delete().eq("id", id);
+  if (error) throw error;
 }
 
 async function unsetDefaultPaymentMethods(
   condominiumId: string,
   excludeId?: string
 ): Promise<void> {
-  const snapshot = await getDocs(
-    query(
-      collection(db, COLLECTION),
-      where("condominium", "==", condominiumId),
-      where("is_default", "==", true)
-    )
-  );
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("id")
+    .eq("condominium", condominiumId)
+    .eq("is_default", true);
 
-  const batch = writeBatch(db);
-  snapshot.docs.forEach((d) => {
-    if (d.id !== excludeId) {
-      batch.update(doc(db, COLLECTION, d.id), {
-        is_default: false,
-        updated_at: Timestamp.now(),
-      });
-    }
-  });
-  await batch.commit();
+  if (error) throw error;
+
+  const ids = (data ?? [])
+    .map((d) => d.id as string)
+    .filter((id) => id !== excludeId);
+
+  if (ids.length === 0) return;
+
+  const { error: updateError } = await supabase
+    .from(TABLE)
+    .update({ is_default: false, updated_at: new Date().toISOString() })
+    .in("id", ids);
+
+  if (updateError) throw updateError;
 }

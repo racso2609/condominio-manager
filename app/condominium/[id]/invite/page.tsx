@@ -48,7 +48,7 @@ export default function InviteResidentPage() {
   }, [condominiumLoading, condominium, router]);
 
   const isExpired = (role: CondominiumRole) =>
-    !!role.expires_at && role.expires_at.toMillis() < now;
+    !!role.expires_at && new Date(role.expires_at).getTime() < now;
 
   const tokenRoles = useMemo(
     () => roles.filter((role) => role.token),
@@ -234,7 +234,7 @@ export default function InviteResidentPage() {
                       : isExpired(r)
                         ? "Expirada"
                         : r.expires_at
-                          ? `Pendiente — expira ${r.expires_at.toDate().toLocaleDateString()}`
+                          ? `Pendiente — expira ${new Date(r.expires_at).toLocaleDateString()}`
                           : "Pendiente"}
                   </p>
                 </div>

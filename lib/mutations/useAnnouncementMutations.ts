@@ -24,21 +24,13 @@ export function useDeleteAnnouncement() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      id,
-      condominiumId,
-    }: {
-      id: string;
-      condominiumId: string;
-    }) => deleteAnnouncement(id, condominiumId),
-    onSuccess: (_, variables) => {
+    mutationFn: deleteAnnouncement,
+    onSuccess: (id) => {
       queryClient.invalidateQueries({
-        queryKey: queryKeys.announcements.byCondominium(
-          variables.condominiumId
-        ),
+        queryKey: queryKeys.announcements.all(),
       });
       queryClient.invalidateQueries({
-        queryKey: queryKeys.announcements.detail(variables.id),
+        queryKey: queryKeys.announcements.detail(id),
       });
     },
   });
