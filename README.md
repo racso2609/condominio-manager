@@ -82,3 +82,4 @@ public/                 # Archivos estáticos
 - `npm run build` — Construye la aplicación para producción.
 - `npm run start` — Inicia la aplicación en modo producción.
 - `npm run lint` — Ejecuta ESLint.
+  a
