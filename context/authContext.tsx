@@ -93,9 +93,9 @@ const AuthProvider: FC<PropsWithChildren> = ({ children }) => {
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      //options: {
-      //  redirectTo: `${typeof window !== "undefined" ? window.location.origin : ""}/home`,
-      //},
+      options: {
+        redirectTo: `https://condominio-manager.vercel.app/`,
+      },
     });
 
     if (error) throw error;
