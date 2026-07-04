@@ -1,10 +1,20 @@
 "use client";
 
 import { WrapContext } from "@/utils/contexts";
-import { createContext, FC, PropsWithChildren, useEffect, useState } from "react";
+import {
+  createContext,
+  FC,
+  PropsWithChildren,
+  useEffect,
+  useState,
+} from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import { getUser, getUserByEmail, createUser } from "@/lib/services/userService";
+import {
+  getUser,
+  getUserByEmail,
+  createUser,
+} from "@/lib/services/userService";
 import { AppUser } from "@/lib/types";
 
 const AuthContext = createContext<{
@@ -40,7 +50,7 @@ const AuthProvider: FC<PropsWithChildren> = ({ children }) => {
               {
                 old_id: legacy.id,
                 new_id: currentUser.id,
-              }
+              },
             );
             if (migrateError) {
               console.error("Failed to migrate legacy user id:", migrateError);
@@ -83,9 +93,9 @@ const AuthProvider: FC<PropsWithChildren> = ({ children }) => {
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: `${typeof window !== "undefined" ? window.location.origin : ""}/home`,
-      },
+      //options: {
+      //  redirectTo: `${typeof window !== "undefined" ? window.location.origin : ""}/home`,
+      //},
     });
 
     if (error) throw error;
