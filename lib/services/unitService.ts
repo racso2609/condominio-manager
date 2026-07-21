@@ -34,7 +34,7 @@ export async function createUnit(data: {
     num: data.num,
     floor: data.floor,
     type: data.type,
-    owner: data.owner ?? "",
+    owner: data.owner ?? null,
     created_at: now,
     updated_at: now,
   };
@@ -67,7 +67,7 @@ export async function generateUnits(
         num,
         floor: actualFloor,
         type,
-        owner: "",
+        owner: null,
         created_at: now,
         updated_at: now,
       };
@@ -173,7 +173,7 @@ export async function rejectUnitClaim(unitId: string): Promise<void> {
   const { error } = await supabase
     .from(TABLE)
     .update({
-      owner: "",
+      owner: null,
       owner_status: null,
       claim_blocked_until: blockedUntil.toISOString(),
       updated_at: new Date().toISOString(),
@@ -213,7 +213,7 @@ export async function removeUnitOwner(unitId: string): Promise<void> {
   const { error } = await supabase
     .from(TABLE)
     .update({
-      owner: "",
+      owner: null,
       owner_status: null,
       updated_at: new Date().toISOString(),
     })

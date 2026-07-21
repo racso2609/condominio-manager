@@ -49,7 +49,7 @@ export interface Unit {
   num: string;
   floor: number;
   type: "residential" | "office";
-  owner: string;
+  owner: string | null;
   owner_status?: "pending" | "verified";
   claim_blocked_until?: string;
   created_at: string;
