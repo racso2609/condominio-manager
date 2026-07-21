@@ -14,6 +14,7 @@ import { useCreateExpenseEntries } from "@/lib/mutations/useExpenseEntryMutation
 import { FormSkeleton } from "@/components/skeleton";
 import { PermissionDenied } from "@/components/PermissionDenied";
 import { ExpenseItem } from "@/lib/types";
+import { FormField, Input, Select, Textarea } from "@/components/Form";
 
 export default function NewExpensePage() {
   const { appUser } = useAuthContext();
@@ -215,49 +216,37 @@ export default function NewExpensePage() {
           </fieldset>
 
           {scope === "building" && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                Edificio
-              </span>
-              <select
+            <FormField label="Edificio">
+              <Select
                 value={effectiveSelectedBuilding}
                 onChange={(e) => setSelectedBuilding(e.target.value)}
                 required
-                className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
               >
                 {buildings.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name}
                   </option>
                 ))}
-              </select>
-            </label>
+              </Select>
+            </FormField>
           )}
 
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              Título
-            </span>
-            <input
+          <FormField label="Título">
+            <Input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
             />
-          </label>
+          </FormField>
 
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              Descripción
-            </span>
-            <textarea
+          <FormField label="Descripción">
+            <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="resize-y rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
             />
-          </label>
+          </FormField>
 
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
@@ -279,11 +268,8 @@ export default function NewExpensePage() {
                   key={item.id}
                   className="grid grid-cols-[1fr,auto,auto] items-end gap-3"
                 >
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
-                      Descripción
-                    </span>
-                    <input
+                  <FormField label="Descripción">
+                    <Input
                       type="text"
                       value={item.description}
                       onChange={(e) =>
@@ -291,14 +277,10 @@ export default function NewExpensePage() {
                       }
                       placeholder="Ej. Mantenimiento ascensor"
                       required
-                      className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
                     />
-                  </label>
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
-                      Monto ($)
-                    </span>
-                    <input
+                  </FormField>
+                  <FormField label="Monto ($)">
+                    <Input
                       type="number"
                       step="0.01"
                       min="0"
@@ -309,9 +291,9 @@ export default function NewExpensePage() {
                         })
                       }
                       required
-                      className="w-28 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
+                      className="w-28"
                     />
-                  </label>
+                  </FormField>
                   {items.length > 1 && (
                     <button
                       type="button"
@@ -337,44 +319,32 @@ export default function NewExpensePage() {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                Fecha de vencimiento
-              </span>
-              <input
+            <FormField label="Fecha de vencimiento">
+              <Input
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
                 required
-                className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
               />
-            </label>
+            </FormField>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                Período desde
-              </span>
-              <input
+            <FormField label="Período desde">
+              <Input
                 type="date"
                 value={periodStart}
                 onChange={(e) => setPeriodStart(e.target.value)}
-                className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
               />
-            </label>
+            </FormField>
 
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                Período hasta
-              </span>
-              <input
+            <FormField label="Período hasta">
+              <Input
                 type="date"
                 value={periodEnd}
                 onChange={(e) => setPeriodEnd(e.target.value)}
-                className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
               />
-            </label>
+            </FormField>
           </div>
         </div>
 

@@ -11,6 +11,7 @@ import { useCreatePaymentMethod } from "@/lib/mutations/usePaymentMethodMutation
 import { PaymentMethodType } from "@/lib/types";
 import { FormSkeleton } from "@/components/skeleton";
 import { PermissionDenied } from "@/components/PermissionDenied";
+import { FormField, Input, Select, Textarea } from "@/components/Form";
 
 const TYPE_OPTIONS: { value: PaymentMethodType; label: string }[] = [
   { value: "bank_transfer", label: "Transferencia bancaria" },
@@ -147,147 +148,107 @@ export default function NewPaymentMethodPage() {
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <div className="flex flex-col gap-4">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              Tipo de método
-            </span>
-            <select
+          <FormField label="Tipo de método">
+            <Select
               value={type}
               onChange={(e) => setType(e.target.value as PaymentMethodType)}
               required
-              className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
             >
               {TYPE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
               ))}
-            </select>
-          </label>
+            </Select>
+          </FormField>
 
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              Nombre del método
-            </span>
-            <input
+          <FormField label="Nombre del método">
+            <Input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ej. Cuenta corriente Banco Mercantil"
               required
-              className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
             />
-          </label>
+          </FormField>
 
           {isVisible("holder_name") && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                Nombre del titular
-              </span>
-              <input
+            <FormField label="Nombre del titular">
+              <Input
                 type="text"
                 value={holderName}
                 onChange={(e) => setHolderName(e.target.value)}
-                className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
               />
-            </label>
+            </FormField>
           )}
 
           {isVisible("bank_name") && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                Banco
-              </span>
-              <input
+            <FormField label="Banco">
+              <Input
                 type="text"
                 value={bankName}
                 onChange={(e) => setBankName(e.target.value)}
-                className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
               />
-            </label>
+            </FormField>
           )}
 
           {isVisible("account_number") && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                Número de cuenta
-              </span>
-              <input
+            <FormField label="Número de cuenta">
+              <Input
                 type="text"
                 value={accountNumber}
                 onChange={(e) => setAccountNumber(e.target.value)}
-                className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
               />
-            </label>
+            </FormField>
           )}
 
           {isVisible("routing_number") && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                Routing / ABA
-              </span>
-              <input
+            <FormField label="Routing / ABA">
+              <Input
                 type="text"
                 value={routingNumber}
                 onChange={(e) => setRoutingNumber(e.target.value)}
-                className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
               />
-            </label>
+            </FormField>
           )}
 
           {isVisible("identification") && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                Documento de identidad
-              </span>
-              <input
+            <FormField label="Documento de identidad">
+              <Input
                 type="text"
                 value={identification}
                 onChange={(e) => setIdentification(e.target.value)}
-                className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
               />
-            </label>
+            </FormField>
           )}
 
           {isVisible("phone") && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                Teléfono
-              </span>
-              <input
+            <FormField label="Teléfono">
+              <Input
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
               />
-            </label>
+            </FormField>
           )}
 
           {isVisible("email") && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                Correo electrónico
-              </span>
-              <input
+            <FormField label="Correo electrónico">
+              <Input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
               />
-            </label>
+            </FormField>
           )}
 
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              Notas adicionales
-            </span>
-            <textarea
+          <FormField label="Notas adicionales">
+            <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="resize-y rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
             />
-          </label>
+          </FormField>
 
           <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
             <input

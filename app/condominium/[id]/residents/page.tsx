@@ -30,23 +30,15 @@ import {
   Unit,
   Building,
   ExpenseEntry,
-  PaymentMethodType,
 } from "@/lib/types";
+import { PaymentMethodCard } from "@/components/PaymentMethodCard";
+import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import Collapse from "@/components/Collapse";
 import PaymentOrderItem from "@/components/PaymentOrderItem";
 import { ResidentsSkeleton } from "@/components/skeleton";
 import { PermissionDenied } from "@/components/PermissionDenied";
-
-const TYPE_LABELS: Record<PaymentMethodType, string> = {
-  bank_transfer: "Transferencia bancaria",
-  mobile_payment: "Pago móvil",
-  zelle: "Zelle",
-  paypal: "PayPal",
-  venmo: "Venmo",
-  cash: "Efectivo",
-  other: "Otro",
-};
+import { FormField, Select } from "@/components/Form";
 
 export default function ResidentsPage() {
   const {
@@ -408,19 +400,14 @@ export default function ResidentsPage() {
                 badge={
                   <div className="flex items-center gap-2">
                     {totalPending > 0 && (
-                      <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                        ${totalPending.toFixed(2)} pendiente
-                      </span>
+                      <Badge color="amber">${totalPending.toFixed(2)} pendiente</Badge>
                     )}
-                    <span
-                      className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider ${
-                        r.status === "verified"
-                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                          : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                      }`}
+                    <Badge
+                      color={r.status === "verified" ? "emerald" : "amber"}
+                      uppercase
                     >
                       {r.status === "verified" ? "Verificado" : "Pendiente"}
-                    </span>
+                    </Badge>
                   </div>
                 }
               >
@@ -431,17 +418,13 @@ export default function ResidentsPage() {
                     </p>
                     {assigningForRole === r.id ? (
                       <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-black">
-                        <label className="flex flex-col gap-1.5">
-                          <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                            Edificio
-                          </span>
-                          <select
+                        <FormField label="Edificio">
+                          <Select
                             value={assignBuildingId}
                             onChange={(e) => {
                               setAssignBuildingId(e.target.value);
                               setAssignUnitId("");
                             }}
-                            className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
                           >
                             <option value="">Selecciona un edificio</option>
                             {buildings.map((b) => (
@@ -449,17 +432,13 @@ export default function ResidentsPage() {
                                 {b.name}
                               </option>
                             ))}
-                          </select>
-                        </label>
-                        <label className="flex flex-col gap-1.5">
-                          <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                            Unidad
-                          </span>
-                          <select
+                          </Select>
+                        </FormField>
+                        <FormField label="Unidad">
+                          <Select
                             value={assignUnitId}
                             onChange={(e) => setAssignUnitId(e.target.value)}
                             disabled={!assignBuildingId}
-                            className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 disabled:opacity-50 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
                           >
                             <option value="">Selecciona una unidad</option>
                             {allUnits
@@ -472,8 +451,8 @@ export default function ResidentsPage() {
                                   {u.num}
                                 </option>
                               ))}
-                          </select>
-                        </label>
+                          </Select>
+                        </FormField>
                         <div className="flex gap-2">
                           <Button
                             onClick={() => handleAssignUnit(r.user)}
@@ -523,26 +502,22 @@ export default function ResidentsPage() {
                             <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
                               {building?.name ?? "?"} / {u.num}
                             </span>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
-                                u.type === "residential"
-                                  ? "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400"
-                                  : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                              }`}
+                            <Badge
+                              color={u.type === "residential" ? "sky" : "amber"}
+                              uppercase
                             >
                               {u.type === "residential" ? "Hab." : "Ofi."}
-                            </span>
-                            <span
-                              className={`ml-auto text-[10px] font-medium ${
-                                u.owner_status === "verified"
-                                  ? "text-emerald-600 dark:text-emerald-400"
-                                  : "text-amber-600 dark:text-amber-400"
-                              }`}
+                            </Badge>
+                            <Badge
+                              color={
+                                u.owner_status === "verified" ? "emerald" : "amber"
+                              }
+                              className="ml-auto"
                             >
                               {u.owner_status === "verified"
                                 ? "Verificado"
                                 : "Pendiente"}
-                            </span>
+                            </Badge>
                             {canRemove && (
                               <Button
                                 onClick={() =>
@@ -609,48 +584,11 @@ export default function ResidentsPage() {
                       ) : (
                         <div className="flex flex-col gap-2">
                           {paymentMethods.map((method) => (
-                            <div
+                            <PaymentMethodCard
                               key={method.id}
-                              className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-black"
-                            >
-                              <div className="flex items-center gap-2">
-                                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                                  {method.name}
-                                </p>
-                                {method.is_default && (
-                                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                                    Predeterminado
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-zinc-500">
-                                {TYPE_LABELS[method.type]}
-                              </p>
-                              <div className="mt-2 grid gap-0.5 text-xs text-zinc-700 dark:text-zinc-300">
-                                {method.holder_name && (
-                                  <p>Titular: {method.holder_name}</p>
-                                )}
-                                {method.bank_name && (
-                                  <p>Banco: {method.bank_name}</p>
-                                )}
-                                {method.account_number && (
-                                  <p>Cuenta: {method.account_number}</p>
-                                )}
-                                {method.routing_number && (
-                                  <p>Routing: {method.routing_number}</p>
-                                )}
-                                {method.phone && <p>Teléfono: {method.phone}</p>}
-                                {method.email && <p>Correo: {method.email}</p>}
-                                {method.identification && (
-                                  <p>Documento: {method.identification}</p>
-                                )}
-                              </div>
-                              {method.notes && (
-                                <p className="mt-2 text-xs text-zinc-500">
-                                  {method.notes}
-                                </p>
-                              )}
-                            </div>
+                              method={method}
+                              compact
+                            />
                           ))}
                         </div>
                       )}

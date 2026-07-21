@@ -15,21 +15,10 @@ import {
 import { usePaymentMethodsByCondominium } from "@/lib/queries/usePaymentMethod";
 import { useReportPayment } from "@/lib/mutations/useExpenseEntryMutations";
 import { generatePaymentReceipt } from "@/lib/utils/receipt";
-import {
-  PaymentMethodType,
-} from "@/lib/types";
+import { PaymentMethodCard } from "@/components/PaymentMethodCard";
 import PaymentOrderItem from "@/components/PaymentOrderItem";
 import { PaymentsSkeleton } from "@/components/skeleton";
-
-const TYPE_LABELS: Record<PaymentMethodType, string> = {
-  bank_transfer: "Transferencia bancaria",
-  mobile_payment: "Pago móvil",
-  zelle: "Zelle",
-  paypal: "PayPal",
-  venmo: "Venmo",
-  cash: "Efectivo",
-  other: "Otro",
-};
+import { FormField, Input, Select } from "@/components/Form";
 
 interface DollarRate {
   moneda: string;
@@ -286,16 +275,12 @@ export default function ResidentPagosPage() {
                     {isReporting && (
                       <div className="mt-3 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-black">
                         <div className="flex flex-col gap-3">
-                          <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                              Método de pago usado
-                            </span>
-                            <select
+                          <FormField label="Método de pago usado">
+                            <Select
                               value={reportPaymentMethod}
                               onChange={(e) =>
                                 setReportPaymentMethod(e.target.value)
                               }
-                              className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
                             >
                               <option value="">Selecciona un método</option>
                               {paymentMethods.map((m) => (
@@ -303,28 +288,21 @@ export default function ResidentPagosPage() {
                                   {m.name}
                                 </option>
                               ))}
-                            </select>
-                          </label>
+                            </Select>
+                          </FormField>
 
-                          <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                              Número de transferencia / referencia
-                            </span>
-                            <input
+                          <FormField label="Número de transferencia / referencia">
+                            <Input
                               type="text"
                               value={reportReference}
                               onChange={(e) =>
                                 setReportReference(e.target.value)
                               }
                               placeholder="Ej. 123456789"
-                              className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
                             />
-                          </label>
+                          </FormField>
 
-                          <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                              Captura / comprobante (opcional)
-                            </span>
+                          <FormField label="Captura / comprobante (opcional)">
                             <input
                               type="file"
                               accept="image/*"
@@ -333,7 +311,7 @@ export default function ResidentPagosPage() {
                               }
                               className="text-sm text-zinc-700 file:mr-3 file:rounded-full file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-zinc-900 hover:file:bg-zinc-200 dark:text-zinc-300 dark:file:bg-zinc-800 dark:file:text-zinc-50 dark:hover:file:bg-zinc-700"
                             />
-                          </label>
+                          </FormField>
 
                           <div className="flex gap-3">
                             <Button
@@ -380,79 +358,7 @@ export default function ResidentPagosPage() {
               </p>
             ) : (
               paymentMethods.map((method) => (
-                <div
-                  key={method.id}
-                  className={`rounded-xl border bg-white p-5 dark:bg-black ${
-                    method.is_default
-                      ? "border-emerald-200 dark:border-emerald-900/50"
-                      : "border-zinc-200 dark:border-zinc-800"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-medium text-zinc-900 dark:text-zinc-50">
-                      {method.name}
-                    </h3>
-                    {method.is_default && (
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                        Predeterminado
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    {TYPE_LABELS[method.type]}
-                  </p>
-
-                  <div className="mt-3 grid gap-1 text-sm text-zinc-700 dark:text-zinc-300">
-                    {method.holder_name && (
-                      <p>
-                        <span className="text-zinc-500">Titular:</span>{" "}
-                        {method.holder_name}
-                      </p>
-                    )}
-                    {method.bank_name && (
-                      <p>
-                        <span className="text-zinc-500">Banco:</span>{" "}
-                        {method.bank_name}
-                      </p>
-                    )}
-                    {method.account_number && (
-                      <p>
-                        <span className="text-zinc-500">Cuenta:</span>{" "}
-                        {method.account_number}
-                      </p>
-                    )}
-                    {method.routing_number && (
-                      <p>
-                        <span className="text-zinc-500">Routing:</span>{" "}
-                        {method.routing_number}
-                      </p>
-                    )}
-                    {method.phone && (
-                      <p>
-                        <span className="text-zinc-500">Teléfono:</span>{" "}
-                        {method.phone}
-                      </p>
-                    )}
-                    {method.email && (
-                      <p>
-                        <span className="text-zinc-500">Correo:</span>{" "}
-                        {method.email}
-                      </p>
-                    )}
-                    {method.identification && (
-                      <p>
-                        <span className="text-zinc-500">Documento:</span>{" "}
-                        {method.identification}
-                      </p>
-                    )}
-                  </div>
-
-                  {method.notes && (
-                    <p className="mt-3 whitespace-pre-wrap text-sm text-zinc-600 dark:text-zinc-400">
-                      {method.notes}
-                    </p>
-                  )}
-                </div>
+                <PaymentMethodCard key={method.id} method={method} />
               ))
             )}
           </section>

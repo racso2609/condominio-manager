@@ -6,6 +6,7 @@ import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
 import { useUpdateUser } from "@/lib/mutations/useUserMutations";
 import { ProfileSkeleton } from "@/components/skeleton";
+import { FormField, Input } from "@/components/Form";
 
 export default function ProfilePage() {
   const { user, appUser } = useAuthContext();
@@ -63,43 +64,32 @@ export default function ProfilePage() {
 
       <form onSubmit={handleSave} className="flex flex-col gap-6">
         <div className="flex flex-col gap-4">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              Nombre
-            </span>
-            <input
+          <FormField label="Nombre">
+            <Input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
             />
-          </label>
+          </FormField>
 
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              Correo electrónico
-            </span>
-            <input
+          <FormField label="Correo electrónico">
+            <Input
               type="email"
               value={appUser?.email ?? ""}
               disabled
-              className="cursor-not-allowed rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-500 outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400"
+              className="cursor-not-allowed bg-zinc-50 text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400"
             />
-          </label>
+          </FormField>
 
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              Teléfono
-            </span>
-            <input
+          <FormField label="Teléfono">
+            <Input
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+58 412 123 4567"
-              className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:placeholder-zinc-500 dark:focus:border-zinc-500"
             />
-          </label>
+          </FormField>
         </div>
 
         <div className="flex items-center gap-3">

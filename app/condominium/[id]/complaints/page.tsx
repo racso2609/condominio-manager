@@ -23,6 +23,9 @@ import {
 } from "@/lib/types";
 import { PageSkeleton } from "@/components/skeleton";
 import { EmptyState } from "@/components/EmptyState";
+import { FilePreview } from "@/components/FilePreview";
+import { Badge } from "@/components/Badge";
+import { FormField, Input, Select } from "@/components/Form";
 
 const STATUS_LABELS: Record<ComplaintStatus, string> = {
   pending: "Pendiente",
@@ -30,13 +33,10 @@ const STATUS_LABELS: Record<ComplaintStatus, string> = {
   resolved: "Resuelta",
 };
 
-const STATUS_COLORS: Record<ComplaintStatus, string> = {
-  pending:
-    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  in_progress:
-    "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  resolved:
-    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+const STATUS_COLORS: Record<ComplaintStatus, import("@/components/Badge").BadgeProps["color"]> = {
+  pending: "amber",
+  in_progress: "blue",
+  resolved: "emerald",
 };
 
 function formatUnits(
@@ -212,10 +212,6 @@ export default function ComplaintsPage() {
             const author = authors[complaint.author];
             const units = authorUnits[complaint.author];
             const unitsText = units ? formatUnits(units, buildingsMap) : "";
-            const images =
-              complaint.files?.filter((f) => f.type === "image") ?? [];
-            const docs =
-              complaint.files?.filter((f) => f.type === "document") ?? [];
             return (
               <div
                 key={complaint.id}
@@ -227,13 +223,9 @@ export default function ComplaintsPage() {
                       <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
                         {complaint.title}
                       </h2>
-                      <span
-                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider ${
-                          STATUS_COLORS[complaint.status]
-                        }`}
-                      >
+                      <Badge color={STATUS_COLORS[complaint.status]} uppercase>
                         {STATUS_LABELS[complaint.status]}
-                      </span>
+                      </Badge>
                     </div>
                     <p className="mt-1 text-xs text-zinc-500">
                       {[
@@ -260,53 +252,15 @@ export default function ComplaintsPage() {
                   {complaint.content}
                 </p>
 
-                {images.length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    {images.map((img, i) => (
-                      <a
-                        key={i}
-                        href={img.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700"
-                      >
-                        <img
-                          src={img.url}
-                          alt={img.name}
-                          className="h-40 w-56 object-cover transition-opacity group-hover:opacity-80"
-                        />
-                      </a>
-                    ))}
-                  </div>
-                )}
-
-                {docs.length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    {docs.map((d, i) => (
-                      <a
-                        key={i}
-                        href={d.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                      >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-[10px] font-bold text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                          PDF
-                        </div>
-                        <span className="truncate">{d.name}</span>
-                      </a>
-                    ))}
-                  </div>
+                {complaint.files && complaint.files.length > 0 && (
+                  <FilePreview files={complaint.files} />
                 )}
 
                 {canManage && (
                   <div className="mt-5 rounded-lg border border-zinc-100 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/50">
-                    <label className="flex flex-col gap-1.5">
-                      <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                        Actualizar estado
-                      </span>
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-                        <select
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                      <FormField label="Actualizar estado">
+                        <Select
                           value={complaint.status}
                           onChange={(e) =>
                             handleStatusChange(
@@ -315,13 +269,14 @@ export default function ComplaintsPage() {
                             )
                           }
                           disabled={isUpdatingStatus}
-                          className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
                         >
                           <option value="pending">Pendiente</option>
                           <option value="in_progress">En progreso</option>
                           <option value="resolved">Resuelta</option>
-                        </select>
-                        <input
+                        </Select>
+                      </FormField>
+                      <FormField label="Notas de resolución (opcional)" className="flex-1">
+                        <Input
                           type="text"
                           value={resolutionNotes[complaint.id] ?? ""}
                           onChange={(e) =>
@@ -331,10 +286,10 @@ export default function ComplaintsPage() {
                             }))
                           }
                           placeholder="Notas de resolución (opcional)"
-                          className="flex-1 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
+                          className="w-full"
                         />
-                      </div>
-                    </label>
+                      </FormField>
+                    </div>
                     {complaint.status === "resolved" &&
                       complaint.resolution_notes && (
                         <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">

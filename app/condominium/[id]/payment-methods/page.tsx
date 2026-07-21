@@ -6,20 +6,10 @@ import { PageHeader } from "@/components/PageHeader";
 import { useCondominiumPage } from "@/hooks/useCondominiumPage";
 import { usePaymentMethodsByCondominium } from "@/lib/queries/usePaymentMethod";
 import { useDeletePaymentMethod } from "@/lib/mutations/usePaymentMethodMutations";
-import { PaymentMethodType } from "@/lib/types";
+import { PaymentMethodCard } from "@/components/PaymentMethodCard";
 import { PageSkeleton } from "@/components/skeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { PermissionDenied } from "@/components/PermissionDenied";
-
-const TYPE_LABELS: Record<PaymentMethodType, string> = {
-  bank_transfer: "Transferencia bancaria",
-  mobile_payment: "Pago móvil",
-  zelle: "Zelle",
-  paypal: "PayPal",
-  venmo: "Venmo",
-  cash: "Efectivo",
-  other: "Otro",
-};
 
 export default function PaymentMethodsPage() {
   const {
@@ -84,78 +74,10 @@ export default function PaymentMethodsPage() {
       ) : (
         <section className="flex flex-col gap-4">
           {methods.map((method) => (
-            <div
+            <PaymentMethodCard
               key={method.id}
-              className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-black"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-                      {method.name}
-                    </h2>
-                    {method.is_default && (
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                        Predeterminado
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-1 text-xs text-zinc-500">
-                    {TYPE_LABELS[method.type]}
-                  </p>
-
-                  <div className="mt-3 grid gap-1 text-sm text-zinc-700 dark:text-zinc-300">
-                    {method.holder_name && (
-                      <p>
-                        <span className="text-zinc-500">Titular:</span>{" "}
-                        {method.holder_name}
-                      </p>
-                    )}
-                    {method.bank_name && (
-                      <p>
-                        <span className="text-zinc-500">Banco:</span>{" "}
-                        {method.bank_name}
-                      </p>
-                    )}
-                    {method.account_number && (
-                      <p>
-                        <span className="text-zinc-500">Cuenta:</span>{" "}
-                        {method.account_number}
-                      </p>
-                    )}
-                    {method.routing_number && (
-                      <p>
-                        <span className="text-zinc-500">Routing:</span>{" "}
-                        {method.routing_number}
-                      </p>
-                    )}
-                    {method.phone && (
-                      <p>
-                        <span className="text-zinc-500">Teléfono:</span>{" "}
-                        {method.phone}
-                      </p>
-                    )}
-                    {method.email && (
-                      <p>
-                        <span className="text-zinc-500">Correo:</span>{" "}
-                        {method.email}
-                      </p>
-                    )}
-                    {method.identification && (
-                      <p>
-                        <span className="text-zinc-500">Documento:</span>{" "}
-                        {method.identification}
-                      </p>
-                    )}
-                  </div>
-
-                  {method.notes && (
-                    <p className="mt-3 whitespace-pre-wrap text-sm text-zinc-600 dark:text-zinc-400">
-                      {method.notes}
-                    </p>
-                  )}
-                </div>
-
+              method={method}
+              actions={
                 <Button
                   type="button"
                   onClick={() => handleDelete(method.id)}
@@ -166,8 +88,8 @@ export default function PaymentMethodsPage() {
                 >
                   {isDeleting ? "..." : "Eliminar"}
                 </Button>
-              </div>
-            </div>
+              }
+            />
           ))}
         </section>
       )}
