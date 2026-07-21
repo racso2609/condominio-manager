@@ -82,9 +82,9 @@ export function useUpdateUnitType() {
       id: string;
       type: "residential" | "office";
     }) => updateUnitType(id, type),
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: queryKeys.units.detail(variables.id),
+        queryKey: queryKeys.units.all(),
       });
     },
   });
@@ -96,12 +96,9 @@ export function useClaimUnit() {
   return useMutation({
     mutationFn: ({ unitId, userId }: { unitId: string; userId: string }) =>
       claimUnit(unitId, userId),
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.units.all(),
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.units.byOwner(variables.userId),
       });
     },
   });
@@ -139,12 +136,9 @@ export function useAssignUnitOwner() {
   return useMutation({
     mutationFn: ({ unitId, userId }: { unitId: string; userId: string }) =>
       assignUnitOwner(unitId, userId),
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: queryKeys.units.detail(variables.unitId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.units.byOwner(variables.userId),
+        queryKey: queryKeys.units.all(),
       });
     },
   });
@@ -155,12 +149,9 @@ export function useRemoveUnitOwner() {
 
   return useMutation({
     mutationFn: removeUnitOwner,
-    onSuccess: (_, unitId) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: queryKeys.units.detail(unitId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.units.byOwnerStatus("verified"),
+        queryKey: queryKeys.units.all(),
       });
     },
   });
