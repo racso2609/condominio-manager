@@ -345,7 +345,7 @@ export default function ResidentsPage() {
           </h2>
           <div className="flex flex-col gap-3">
             {pendingUnits.map((u) => {
-              const owner = owners[u.owner];
+              const owner = u.owner ? owners[u.owner] : undefined;
               const building = buildingsMap[u.building];
               const role = roles.find((r) => r.user === u.owner);
               return (
