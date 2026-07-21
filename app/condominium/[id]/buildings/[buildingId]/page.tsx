@@ -25,13 +25,19 @@ export default function BuildingDetail() {
   const buildingId = params.buildingId as string;
   const condominiumId = params.id as string;
 
-  const { data: building, isLoading: buildingLoading } = useBuilding(buildingId);
+  const { data: building, isLoading: buildingLoading } =
+    useBuilding(buildingId);
   const { data: units = [], isLoading: unitsLoading } =
     useUnitsByBuilding(buildingId);
 
   const ownerIds = useMemo(
-    () => Array.from(new Set(units.map((u) => u.owner).filter((id): id is string => id !== null))),
-    [units]
+    () =>
+      Array.from(
+        new Set(
+          units.map((u) => u.owner).filter((id): id is string => id !== null),
+        ),
+      ),
+    [units],
   );
   const ownersQueries = useUsers(ownerIds);
 
@@ -105,7 +111,7 @@ export default function BuildingDetail() {
   const bulkSetType = async (type: "residential" | "office") => {
     setProcessing(true);
     await Promise.all(
-      [...selected].map((id) => updateUnitTypeAsync({ id, type }))
+      [...selected].map((id) => updateUnitTypeAsync({ id, type })),
     );
     setSelected(new Set());
     setProcessing(false);
@@ -114,7 +120,7 @@ export default function BuildingDetail() {
   const handleDeleteBuilding = () => {
     if (
       !window.confirm(
-        "¿Eliminar este edificio? Esta acción no se puede deshacer."
+        "¿Eliminar este edificio? Esta acción no se puede deshacer.",
       )
     )
       return;
@@ -130,9 +136,10 @@ export default function BuildingDetail() {
     claimUnit(
       { unitId, userId: appUser.id },
       {
-        onError: (e) => alert(e instanceof Error ? e.message : "Error al reclamar unidad"),
+        onError: (e) =>
+          alert(e instanceof Error ? e.message : "Error al reclamar unidad"),
         onSettled: () => setClaimingId(null),
-      }
+      },
     );
   };
 
@@ -143,7 +150,7 @@ export default function BuildingDetail() {
   const handleReject = (unitId: string) => {
     if (
       !window.confirm(
-        "¿Rechazar esta solicitud? El usuario no podrá reclamar esta unidad por 1 semana."
+        "¿Rechazar esta solicitud? El usuario no podrá reclamar esta unidad por 1 semana.",
       )
     )
       return;
@@ -179,7 +186,6 @@ export default function BuildingDetail() {
         <span>/</span>
         <span className="text-zinc-900 dark:text-zinc-50">{building.name}</span>
       </div>
-
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-4">
           <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-100 text-lg font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
@@ -223,7 +229,6 @@ export default function BuildingDetail() {
           </div>
         )}
       </div>
-
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
           Unidades {units.length > 0 && `(${units.length})`}
@@ -250,7 +255,6 @@ export default function BuildingDetail() {
           </div>
         )}
       </div>
-
       {selected.size > 0 && isAdminOrManager && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-700 dark:bg-zinc-900">
           <span className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -288,7 +292,6 @@ export default function BuildingDetail() {
           </div>
         </div>
       )}
-
       {units.length === 0 ? (
         <section className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-black">
           <p className="text-zinc-500 dark:text-zinc-400">
@@ -316,7 +319,7 @@ export default function BuildingDetail() {
           )}
           {(() => {
             const floors = [...new Set(units.map((u) => u.floor))].sort(
-              (a, b) => b - a
+              (a, b) => b - a,
             );
             return floors.map((floor) => {
               const floorUnits = units
@@ -373,7 +376,8 @@ export default function BuildingDetail() {
                           </span>
                         )}
                         {u.claim_blocked_until &&
-                          new Date(u.claim_blocked_until).getTime() > Date.now() && (
+                          new Date(u.claim_blocked_until).getTime() >
+                            Date.now() && (
                             <span className="ml-auto text-[10px] text-red-400">
                               Bloqueada
                             </span>
@@ -382,14 +386,17 @@ export default function BuildingDetail() {
                           appUser &&
                           !(
                             u.claim_blocked_until &&
-                            new Date(u.claim_blocked_until).getTime() > Date.now()
+                            new Date(u.claim_blocked_until).getTime() >
+                              Date.now()
                           ) && (
                             <button
                               onClick={() => handleClaim(u.id)}
                               disabled={claiming && claimingId === u.id}
                               className="ml-auto h-7 rounded-full border border-zinc-300 px-3 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
                             >
-                              {claiming && claimingId === u.id ? "..." : "Reclamar"}
+                              {claiming && claimingId === u.id
+                                ? "..."
+                                : "Reclamar"}
                             </button>
                           )}
                         {isAdminOrManager &&

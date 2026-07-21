@@ -98,7 +98,7 @@ export function useClaimUnit() {
       claimUnit(unitId, userId),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
-        queryKey: queryKeys.units.detail(variables.unitId),
+        queryKey: queryKeys.units.all(),
       });
       queryClient.invalidateQueries({
         queryKey: queryKeys.units.byOwner(variables.userId),
@@ -112,12 +112,9 @@ export function useRejectUnitClaim() {
 
   return useMutation({
     mutationFn: rejectUnitClaim,
-    onSuccess: (_, unitId) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: queryKeys.units.detail(unitId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.units.byOwnerStatus("pending"),
+        queryKey: queryKeys.units.all(),
       });
     },
   });
@@ -128,15 +125,9 @@ export function useVerifyUnitOwner() {
 
   return useMutation({
     mutationFn: verifyUnitOwner,
-    onSuccess: (_, unitId) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: queryKeys.units.detail(unitId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.units.byOwnerStatus("pending"),
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.units.byOwnerStatus("verified"),
+        queryKey: queryKeys.units.all(),
       });
     },
   });
