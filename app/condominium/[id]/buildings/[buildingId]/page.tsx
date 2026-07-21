@@ -30,7 +30,7 @@ export default function BuildingDetail() {
     useUnitsByBuilding(buildingId);
 
   const ownerIds = useMemo(
-    () => Array.from(new Set(units.filter((u) => u.owner).map((u) => u.owner))),
+    () => Array.from(new Set(units.map((u) => u.owner).filter((id): id is string => id !== null))),
     [units]
   );
   const ownersQueries = useUsers(ownerIds);
