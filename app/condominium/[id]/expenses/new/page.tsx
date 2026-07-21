@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
+import { Breadcrumb } from "@/components/Breadcrumb";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
 import { useCondominium } from "@/lib/queries/useCondominium";
@@ -175,30 +175,14 @@ export default function NewExpensePage() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
-      <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-        <Link
-          href="/home"
-          className="hover:text-zinc-700 dark:hover:text-zinc-200"
-        >
-          Mis condominios
-        </Link>
-        <span>/</span>
-        <Link
-          href={`/condominium/${condominiumId}`}
-          className="hover:text-zinc-700 dark:hover:text-zinc-200"
-        >
-          {condominium.name}
-        </Link>
-        <span>/</span>
-        <Link
-          href={`/condominium/${condominiumId}/expenses`}
-          className="hover:text-zinc-700 dark:hover:text-zinc-200"
-        >
-          Gastos
-        </Link>
-        <span>/</span>
-        <span className="text-zinc-900 dark:text-zinc-50">Nuevo</span>
-      </div>
+      <Breadcrumb
+        items={[
+          { label: "Mis condominios", href: "/home" },
+          { label: condominium.name, href: `/condominium/${condominiumId}` },
+          { label: "Gastos", href: `/condominium/${condominiumId}/expenses` },
+          { label: "Nuevo" },
+        ]}
+      />
 
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">

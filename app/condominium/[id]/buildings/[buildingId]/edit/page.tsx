@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { Breadcrumb } from "@/components/Breadcrumb";
 import { useAuthContext } from "@/context/authContext";
 import { useBuilding } from "@/lib/queries/useBuilding";
 import { useUpdateBuilding } from "@/lib/mutations/useBuildingMutations";
@@ -171,30 +172,17 @@ export default function EditBuilding() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
-      <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-        <Link
-          href="/home"
-          className="hover:text-zinc-700 dark:hover:text-zinc-200"
-        >
-          Mis condominios
-        </Link>
-        <span>/</span>
-        <Link
-          href={`/condominium/${condominiumId}`}
-          className="hover:text-zinc-700 dark:hover:text-zinc-200"
-        >
-          Condominio
-        </Link>
-        <span>/</span>
-        <Link
-          href={`/condominium/${condominiumId}/buildings/${buildingId}`}
-          className="hover:text-zinc-700 dark:hover:text-zinc-200"
-        >
-          Edificio
-        </Link>
-        <span>/</span>
-        <span className="text-zinc-900 dark:text-zinc-50">Editar</span>
-      </div>
+      <Breadcrumb
+        items={[
+          { label: "Mis condominios", href: "/home" },
+          { label: "Condominio", href: `/condominium/${condominiumId}` },
+          {
+            label: "Edificio",
+            href: `/condominium/${condominiumId}/buildings/${buildingId}`,
+          },
+          { label: "Editar" },
+        ]}
+      />
 
       <div className="rounded-xl border border-zinc-200 bg-white p-8 dark:border-zinc-800 dark:bg-black">
         <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">

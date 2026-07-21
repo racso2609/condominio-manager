@@ -3,6 +3,7 @@
 import { useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { Breadcrumb } from "@/components/Breadcrumb";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
 import { useCondominium, useUserCondominiumRole } from "@/lib/queries/useCondominium";
@@ -90,16 +91,12 @@ export default function CondominiumDetail() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
-      <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-        <Link
-          href="/home"
-          className="hover:text-zinc-700 dark:hover:text-zinc-200"
-        >
-          Mis condominios
-        </Link>
-        <span>/</span>
-        <span className="text-zinc-900 dark:text-zinc-50">{condominium.name}</span>
-      </div>
+      <Breadcrumb
+        items={[
+          { label: "Mis condominios", href: "/home" },
+          { label: condominium.name },
+        ]}
+      />
 
       <div className="flex items-start justify-between gap-4">
         <div>

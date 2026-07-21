@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
+import { Breadcrumb } from "@/components/Breadcrumb";
 import { useAuthContext } from "@/context/authContext";
 import { Button } from "@/components/Button";
 import { useCondominium } from "@/lib/queries/useCondominium";
@@ -68,23 +68,13 @@ export default function AnnouncementsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
-      <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-        <Link
-          href="/home"
-          className="hover:text-zinc-700 dark:hover:text-zinc-200"
-        >
-          Mis condominios
-        </Link>
-        <span>/</span>
-        <Link
-          href={`/condominium/${condominium.id}`}
-          className="hover:text-zinc-700 dark:hover:text-zinc-200"
-        >
-          {condominium.name}
-        </Link>
-        <span>/</span>
-        <span className="text-zinc-900 dark:text-zinc-50">Anuncios</span>
-      </div>
+      <Breadcrumb
+        items={[
+          { label: "Mis condominios", href: "/home" },
+          { label: condominium.name, href: `/condominium/${condominium.id}` },
+          { label: "Anuncios" },
+        ]}
+      />
 
       <div className="flex items-center justify-between">
         <div>

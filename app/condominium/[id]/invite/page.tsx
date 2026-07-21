@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
+import { Breadcrumb } from "@/components/Breadcrumb";
 import { useAuthContext } from "@/context/authContext";
 import { useCondominium, useCondominiumRoles } from "@/lib/queries/useCondominium";
 import {
@@ -118,23 +118,13 @@ export default function InviteResidentPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8">
-      <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-        <Link
-          href="/home"
-          className="hover:text-zinc-700 dark:hover:text-zinc-200"
-        >
-          Mis condominios
-        </Link>
-        <span>/</span>
-        <Link
-          href={`/condominium/${condominium.id}`}
-          className="hover:text-zinc-700 dark:hover:text-zinc-200"
-        >
-          {condominium.name}
-        </Link>
-        <span>/</span>
-        <span className="text-zinc-900 dark:text-zinc-50">Invitar</span>
-      </div>
+      <Breadcrumb
+        items={[
+          { label: "Mis condominios", href: "/home" },
+          { label: condominium.name, href: `/condominium/${condominium.id}` },
+          { label: "Invitar" },
+        ]}
+      />
 
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
