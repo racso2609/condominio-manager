@@ -3,6 +3,7 @@
 import { useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Breadcrumb } from "@/components/Breadcrumb";
+import { PageHeader } from "@/components/PageHeader";
 import { useAuthContext } from "@/context/authContext";
 import { useCondominium } from "@/lib/queries/useCondominium";
 import { useExpense } from "@/lib/queries/useExpense";
@@ -12,6 +13,7 @@ import { useBuildings } from "@/lib/queries/useBuilding";
 import { useMarkEntryAsPaid } from "@/lib/mutations/useExpenseEntryMutations";
 import PaymentOrderItem from "@/components/PaymentOrderItem";
 import { PageSkeleton } from "@/components/skeleton";
+import { PermissionDenied } from "@/components/PermissionDenied";
 
 export default function ExpenseDetailPage() {
   const { appUser } = useAuthContext();
@@ -99,11 +101,7 @@ export default function ExpenseDetailPage() {
 
   if (!isAdminOrManager) {
     return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <p className="text-zinc-500 dark:text-zinc-400">
-          No tienes permisos para ver esta página.
-        </p>
-      </div>
+      <PermissionDenied message="No tienes permisos para ver esta página." />
     );
   }
 
@@ -125,14 +123,10 @@ export default function ExpenseDetailPage() {
         ]}
       />
 
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          {expense.title}
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          {condominium.name} · Vence: {new Date(expense.due_date).toLocaleDateString()}
-        </p>
-      </div>
+      <PageHeader
+        title={expense.title}
+        subtitle={`${condominium.name} · Vence: ${new Date(expense.due_date).toLocaleDateString()}`}
+      />
 
       <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-black">
         <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">

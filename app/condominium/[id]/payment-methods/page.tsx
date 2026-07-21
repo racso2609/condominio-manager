@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Button } from "@/components/Button";
-import { useAuthContext } from "@/context/authContext";
-import { useCondominium } from "@/lib/queries/useCondominium";
+import { PageHeader } from "@/components/PageHeader";
+import { useCondominiumPage } from "@/hooks/useCondominiumPage";
 import { usePaymentMethodsByCondominium } from "@/lib/queries/usePaymentMethod";
 import { useDeletePaymentMethod } from "@/lib/mutations/usePaymentMethodMutations";
 import { PaymentMethodType } from "@/lib/types";
 import { PageSkeleton } from "@/components/skeleton";
+import { EmptyState } from "@/components/EmptyState";
+import { PermissionDenied } from "@/components/PermissionDenied";
 
 const TYPE_LABELS: Record<PaymentMethodType, string> = {
   bank_transfer: "Transferencia bancaria",
@@ -22,27 +22,17 @@ const TYPE_LABELS: Record<PaymentMethodType, string> = {
 };
 
 export default function PaymentMethodsPage() {
-  const { appUser } = useAuthContext();
-  const params = useParams();
-  const router = useRouter();
-  const condominiumId = params.id as string;
-
-  const { data: condominium, isLoading: condominiumLoading } =
-    useCondominium(condominiumId);
+  const {
+    condominiumId,
+    condominium,
+    condominiumLoading,
+    isAdminOrManager,
+  } = useCondominiumPage();
   const { data: methods = [], isLoading: methodsLoading } =
     usePaymentMethodsByCondominium(condominiumId);
 
   const { mutate: deletePaymentMethod, isPending: isDeleting } =
     useDeletePaymentMethod();
-
-  const isAdminOrManager =
-    appUser?.role === "admin" || appUser?.role === "administrator";
-
-  useEffect(() => {
-    if (!condominiumLoading && condominium === null) {
-      router.replace("/home");
-    }
-  }, [condominiumLoading, condominium, router]);
 
   const handleDelete = (methodId: string) => {
     if (!confirm("¿Estás seguro de que deseas eliminar este método de pago?"))
@@ -59,11 +49,7 @@ export default function PaymentMethodsPage() {
 
   if (!isAdminOrManager) {
     return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <p className="text-zinc-500 dark:text-zinc-400">
-          No tienes permisos para gestionar métodos de pago.
-        </p>
-      </div>
+      <PermissionDenied message="No tienes permisos para gestionar métodos de pago." />
     );
   }
 
@@ -79,30 +65,22 @@ export default function PaymentMethodsPage() {
         ]}
       />
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Métodos de pago
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            {condominium.name}
-          </p>
-        </div>
-        <Button
-          href={`/condominium/${condominium.id}/payment-methods/new`}
-          variant="primary"
-          size="lg"
-        >
-          Nuevo método
-        </Button>
-      </div>
+      <PageHeader
+        title="Métodos de pago"
+        subtitle={condominium.name}
+        action={
+          <Button
+            href={`/condominium/${condominium.id}/payment-methods/new`}
+            variant="primary"
+            size="lg"
+          >
+            Nuevo método
+          </Button>
+        }
+      />
 
       {methods.length === 0 ? (
-        <section className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-black">
-          <p className="text-zinc-500 dark:text-zinc-400">
-            No hay métodos de pago registrados.
-          </p>
-        </section>
+        <EmptyState message="No hay métodos de pago registrados." />
       ) : (
         <section className="flex flex-col gap-4">
           {methods.map((method) => (

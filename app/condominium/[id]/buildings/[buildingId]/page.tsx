@@ -17,6 +17,7 @@ import {
   useRejectUnitClaim,
 } from "@/lib/mutations/useUnitMutations";
 import { BuildingDetailSkeleton } from "@/components/skeleton";
+import { EmptyState } from "@/components/EmptyState";
 
 export default function BuildingDetail() {
   const { appUser } = useAuthContext();
@@ -283,13 +284,7 @@ export default function BuildingDetail() {
         </div>
       )}
       {units.length === 0 ? (
-        <section className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-black">
-          <p className="text-zinc-500 dark:text-zinc-400">
-            {isAdminOrManager
-              ? 'Usa el botón "Generar unidades" para crearlas automáticamente.'
-              : "No hay unidades registradas en este edificio."}
-          </p>
-        </section>
+        <EmptyState message={isAdminOrManager ? 'Usa el botón "Generar unidades" para crearlas automáticamente.' : "No hay unidades registradas en este edificio."} />
       ) : (
         <div className="flex flex-col gap-6">
           {isAdminOrManager && selectMode && units.length > 0 && (

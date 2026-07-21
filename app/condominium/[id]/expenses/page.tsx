@@ -1,25 +1,24 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useMemo } from "react";
 import Link from "next/link";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Button } from "@/components/Button";
-import { useAuthContext } from "@/context/authContext";
-import { useCondominium } from "@/lib/queries/useCondominium";
+import { PageHeader } from "@/components/PageHeader";
+import { useCondominiumPage } from "@/hooks/useCondominiumPage";
 import { useBuildingsByCondominium } from "@/lib/queries/useBuilding";
 import { useExpensesByCondominium } from "@/lib/queries/useExpense";
 import { useEntriesByExpenses } from "@/lib/queries/useExpenseEntry";
 import { PageSkeleton } from "@/components/skeleton";
+import { EmptyState } from "@/components/EmptyState";
 
 export default function ExpensesPage() {
-  const { appUser } = useAuthContext();
-  const params = useParams();
-  const router = useRouter();
-  const condominiumId = params.id as string;
-
-  const { data: condominium, isLoading: condominiumLoading } =
-    useCondominium(condominiumId);
+  const {
+    condominiumId,
+    condominium,
+    condominiumLoading,
+    isAdminOrManager,
+  } = useCondominiumPage();
   const { data: buildings = [], isLoading: buildingsLoading } =
     useBuildingsByCondominium(condominiumId);
   const { data: expenses = [], isLoading: expensesLoading } =
@@ -39,15 +38,6 @@ export default function ExpensesPage() {
     return counts;
   }, [entriesQueries, expenseIds]);
 
-  const isAdminOrManager =
-    appUser?.role === "admin" || appUser?.role === "administrator";
-
-  useEffect(() => {
-    if (!condominiumLoading && condominium === null) {
-      router.replace("/home");
-    }
-  }, [condominiumLoading, condominium, router]);
-
   const loading =
     condominiumLoading || buildingsLoading || expensesLoading ||
     entriesQueries.some((q) => q.isLoading);
@@ -66,32 +56,24 @@ export default function ExpensesPage() {
         ]}
       />
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Gastos
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            {condominium.name}
-          </p>
-        </div>
-        {isAdminOrManager && (
-          <Button
-            href={`/condominium/${condominium.id}/expenses/new`}
-            variant="primary"
-            size="lg"
-          >
-            Nuevo gasto
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Gastos"
+        subtitle={condominium.name}
+        action={
+          isAdminOrManager ? (
+            <Button
+              href={`/condominium/${condominium.id}/expenses/new`}
+              variant="primary"
+              size="lg"
+            >
+              Nuevo gasto
+            </Button>
+          ) : undefined
+        }
+      />
 
       {expenses.length === 0 ? (
-        <section className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-black">
-          <p className="text-zinc-500 dark:text-zinc-400">
-            No hay gastos registrados.
-          </p>
-        </section>
+        <EmptyState message="No hay gastos registrados." />
       ) : (
         <section className="flex flex-col gap-4">
           {expenses.map((exp) => {

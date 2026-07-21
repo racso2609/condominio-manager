@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Breadcrumb } from "@/components/Breadcrumb";
+import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
 import { useCreateAnnouncement } from "@/lib/mutations/useAnnouncementMutations";
+import { PermissionDenied } from "@/components/PermissionDenied";
 
 const ALLOWED_TYPES = [
   "image/jpeg", "image/png", "image/webp", "image/gif",
@@ -73,11 +75,7 @@ export default function NewAnnouncementPage() {
 
   if (!isAdminOrManager) {
     return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <p className="text-zinc-500 dark:text-zinc-400">
-          No tienes permisos para crear anuncios.
-        </p>
-      </div>
+      <PermissionDenied message="No tienes permisos para crear anuncios." />
     );
   }
 
@@ -95,11 +93,7 @@ export default function NewAnnouncementPage() {
         ]}
       />
 
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Nuevo anuncio
-        </h1>
-      </div>
+      <PageHeader title="Nuevo anuncio" />
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <div className="flex flex-col gap-4">

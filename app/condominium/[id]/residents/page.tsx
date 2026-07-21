@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import { Breadcrumb } from "@/components/Breadcrumb";
-import { useAuthContext } from "@/context/authContext";
-import { useCondominium, useCondominiumRoles } from "@/lib/queries/useCondominium";
+import { PageHeader } from "@/components/PageHeader";
+import { useCondominiumPage } from "@/hooks/useCondominiumPage";
+import { useCondominiumRoles } from "@/lib/queries/useCondominium";
 import { useBuildingsByCondominium } from "@/lib/queries/useBuilding";
 import { useUnitsByBuildings } from "@/lib/queries/useUnit";
 import { useUsers } from "@/lib/queries/useUser";
@@ -36,6 +36,7 @@ import { Button } from "@/components/Button";
 import Collapse from "@/components/Collapse";
 import PaymentOrderItem from "@/components/PaymentOrderItem";
 import { ResidentsSkeleton } from "@/components/skeleton";
+import { PermissionDenied } from "@/components/PermissionDenied";
 
 const TYPE_LABELS: Record<PaymentMethodType, string> = {
   bank_transfer: "Transferencia bancaria",
@@ -48,13 +49,13 @@ const TYPE_LABELS: Record<PaymentMethodType, string> = {
 };
 
 export default function ResidentsPage() {
-  const { appUser } = useAuthContext();
-  const params = useParams();
-  const router = useRouter();
-  const condominiumId = params.id as string;
-
-  const { data: condominium, isLoading: condominiumLoading } =
-    useCondominium(condominiumId);
+  const {
+    appUser,
+    condominiumId,
+    condominium,
+    condominiumLoading,
+    isAdminOrManager,
+  } = useCondominiumPage();
   const { data: roles = [], isLoading: rolesLoading } =
     useCondominiumRoles(condominiumId);
   const { data: buildings = [], isLoading: buildingsLoading } =
@@ -149,15 +150,6 @@ export default function ResidentsPage() {
   const { mutate: deleteCondominiumRole } = useDeleteCondominiumRole();
   const { mutate: markEntryAsPaid, isPending: validatingPayment } =
     useMarkEntryAsPaid();
-
-  const isAdminOrManager =
-    appUser?.role === "admin" || appUser?.role === "administrator";
-
-  useEffect(() => {
-    if (!condominiumLoading && condominium === null) {
-      router.replace("/home");
-    }
-  }, [condominiumLoading, condominium, router]);
 
   const handleReject = (unitId: string) => {
     if (
@@ -301,11 +293,7 @@ export default function ResidentsPage() {
 
   if (!isAdminOrManager) {
     return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <p className="text-zinc-500 dark:text-zinc-400">
-          No tienes permisos para gestionar residentes.
-        </p>
-      </div>
+      <PermissionDenied message="No tienes permisos para gestionar residentes." />
     );
   }
 
@@ -319,14 +307,7 @@ export default function ResidentsPage() {
         ]}
       />
 
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Gestionar residentes
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          {condominium.name}
-        </p>
-      </div>
+      <PageHeader title="Gestionar residentes" subtitle={condominium.name} />
 
       {pendingUnits.length > 0 && (
         <section>

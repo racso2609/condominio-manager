@@ -1,27 +1,28 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useMemo } from "react";
 import Link from "next/link";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Button } from "@/components/Button";
-import { useAuthContext } from "@/context/authContext";
-import { useCondominium, useUserCondominiumRole } from "@/lib/queries/useCondominium";
+import { useCondominiumPage } from "@/hooks/useCondominiumPage";
+import { useUserCondominiumRole } from "@/lib/queries/useCondominium";
 import { useBuildingsByCondominium } from "@/lib/queries/useBuilding";
 import { useUnitsByBuildings } from "@/lib/queries/useUnit";
 import { useEntriesByUnits } from "@/lib/queries/useExpenseEntry";
 import { useUpdateCondominiumStatus } from "@/lib/mutations/useCondominiumMutations";
 import StatusBadge from "@/components/StatusBadge";
 import { CondominiumDetailSkeleton } from "@/components/skeleton";
+import { EmptyState } from "@/components/EmptyState";
 
 export default function CondominiumDetail() {
-  const { appUser } = useAuthContext();
-  const params = useParams();
-  const router = useRouter();
-  const condominiumId = params.id as string;
-
-  const { data: condominium, isLoading: condominiumLoading } =
-    useCondominium(condominiumId);
+  const {
+    appUser,
+    params,
+    condominiumId,
+    condominium,
+    condominiumLoading,
+    isAdminOrManager,
+  } = useCondominiumPage();
   const { data: buildings = [], isLoading: buildingsLoading } =
     useBuildingsByCondominium(condominiumId);
   const { data: userRole, isLoading: roleLoading } = useUserCondominiumRole(
@@ -42,15 +43,6 @@ export default function CondominiumDetail() {
 
   const { mutate: updateStatus, isPending: changingStatus } =
     useUpdateCondominiumStatus();
-
-  const isAdminOrManager =
-    appUser?.role === "admin" || appUser?.role === "administrator";
-
-  useEffect(() => {
-    if (!condominiumLoading && condominium === null) {
-      router.replace("/home");
-    }
-  }, [condominiumLoading, condominium, router]);
 
   const handleToggleStatus = async () => {
     if (!condominium || !appUser) return;
@@ -241,13 +233,7 @@ export default function CondominiumDetail() {
       </div>
 
       {buildings.length === 0 ? (
-        <section className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-black">
-          <p className="text-zinc-500 dark:text-zinc-400">
-            {isAdminOrManager
-              ? 'Usa el botón "Añadir edificio" para comenzar a registrar los edificios de este condominio.'
-              : "No hay edificios disponibles en este momento."}
-          </p>
-        </section>
+        <EmptyState message={isAdminOrManager ? 'Usa el botón "Añadir edificio" para comenzar a registrar los edificios de este condominio.' : "No hay edificios disponibles en este momento."} />
       ) : (
         <section className="grid gap-4 sm:grid-cols-2">
           {buildings.map((b) => (

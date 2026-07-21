@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Button } from "@/components/Button";
-import { useAuthContext } from "@/context/authContext";
-import { useCondominium } from "@/lib/queries/useCondominium";
+import { PageHeader } from "@/components/PageHeader";
+import { useCondominiumPage } from "@/hooks/useCondominiumPage";
 import { useUnitsByOwner } from "@/lib/queries/useUnit";
 import { useBuildings } from "@/lib/queries/useBuilding";
 import { useEntriesByUnits } from "@/lib/queries/useExpenseEntry";
@@ -43,13 +42,12 @@ interface DollarRate {
 }
 
 export default function ResidentPagosPage() {
-  const { appUser } = useAuthContext();
-  const params = useParams();
-  const router = useRouter();
-  const condominiumId = params.id as string;
-
-  const { data: condominium, isLoading: condominiumLoading } =
-    useCondominium(condominiumId);
+  const {
+    appUser,
+    condominiumId,
+    condominium,
+    condominiumLoading,
+  } = useCondominiumPage();
   const { data: userUnits = [], isLoading: unitsLoading } = useUnitsByOwner(
     appUser?.id
   );
@@ -120,12 +118,6 @@ export default function ResidentPagosPage() {
       })
       .catch(() => setDolarRate(null));
   }, [condominium]);
-
-  useEffect(() => {
-    if (!condominiumLoading && condominium === null) {
-      router.replace("/home");
-    }
-  }, [condominiumLoading, condominium, router]);
 
   const formatBs = (amount: number) =>
     amount.toLocaleString("es-VE", {
@@ -212,14 +204,7 @@ export default function ResidentPagosPage() {
         ]}
       />
 
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Mis pagos
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          {condominium.name}
-        </p>
-      </div>
+      <PageHeader title="Mis pagos" subtitle={condominium.name} />
 
       {units.length === 0 ? (
         <section className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-black">

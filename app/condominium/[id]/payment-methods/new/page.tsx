@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Breadcrumb } from "@/components/Breadcrumb";
+import { PageHeader } from "@/components/PageHeader";
 import { useAuthContext } from "@/context/authContext";
 import { useCondominium } from "@/lib/queries/useCondominium";
 import { useCreatePaymentMethod } from "@/lib/mutations/usePaymentMethodMutations";
 import { PaymentMethodType } from "@/lib/types";
 import { FormSkeleton } from "@/components/skeleton";
+import { PermissionDenied } from "@/components/PermissionDenied";
 
 const TYPE_OPTIONS: { value: PaymentMethodType; label: string }[] = [
   { value: "bank_transfer", label: "Transferencia bancaria" },
@@ -121,11 +123,7 @@ export default function NewPaymentMethodPage() {
 
   if (!isAdminOrManager) {
     return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <p className="text-zinc-500 dark:text-zinc-400">
-          No tienes permisos para crear métodos de pago.
-        </p>
-      </div>
+      <PermissionDenied message="No tienes permisos para crear métodos de pago." />
     );
   }
 
@@ -145,11 +143,7 @@ export default function NewPaymentMethodPage() {
         ]}
       />
 
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Nuevo método de pago
-        </h1>
-      </div>
+      <PageHeader title="Nuevo método de pago" />
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <div className="flex flex-col gap-4">

@@ -1,25 +1,24 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useMemo } from "react";
 import { Breadcrumb } from "@/components/Breadcrumb";
-import { useAuthContext } from "@/context/authContext";
+import { PageHeader } from "@/components/PageHeader";
+import { useCondominiumPage } from "@/hooks/useCondominiumPage";
 import { Button } from "@/components/Button";
-import { useCondominium } from "@/lib/queries/useCondominium";
 import { useAnnouncementsByCondominium } from "@/lib/queries/useAnnouncement";
 import { useUsers } from "@/lib/queries/useUser";
 import { useDeleteAnnouncement } from "@/lib/mutations/useAnnouncementMutations";
 import { Announcement } from "@/lib/types";
 import { PageSkeleton } from "@/components/skeleton";
+import { EmptyState } from "@/components/EmptyState";
 
 export default function AnnouncementsPage() {
-  const { appUser } = useAuthContext();
-  const params = useParams();
-  const router = useRouter();
-  const condominiumId = params.id as string;
-
-  const { data: condominium, isLoading: condominiumLoading } =
-    useCondominium(condominiumId);
+  const {
+    condominiumId,
+    condominium,
+    condominiumLoading,
+    isAdminOrManager,
+  } = useCondominiumPage();
   const { data: announcements = [], isLoading: announcementsLoading } =
     useAnnouncementsByCondominium(condominiumId);
 
@@ -39,15 +38,6 @@ export default function AnnouncementsPage() {
 
   const { mutate: deleteAnnouncement, isPending: isDeleting } =
     useDeleteAnnouncement();
-
-  const isAdminOrManager =
-    appUser?.role === "admin" || appUser?.role === "administrator";
-
-  useEffect(() => {
-    if (!condominiumLoading && condominium === null) {
-      router.replace("/home");
-    }
-  }, [condominiumLoading, condominium, router]);
 
   const handleDelete = (announcement: Announcement) => {
     if (
@@ -76,32 +66,24 @@ export default function AnnouncementsPage() {
         ]}
       />
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Anuncios
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            {condominium.name}
-          </p>
-        </div>
-        {isAdminOrManager && (
-          <Button
-            href={`/condominium/${condominium.id}/announcements/new`}
-            variant="primary"
-            size="lg"
-          >
-            Nuevo anuncio
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Anuncios"
+        subtitle={condominium.name}
+        action={
+          isAdminOrManager ? (
+            <Button
+              href={`/condominium/${condominium.id}/announcements/new`}
+              variant="primary"
+              size="lg"
+            >
+              Nuevo anuncio
+            </Button>
+          ) : undefined
+        }
+      />
 
       {announcements.length === 0 ? (
-        <section className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-black">
-          <p className="text-zinc-500 dark:text-zinc-400">
-            No hay anuncios publicados.
-          </p>
-        </section>
+        <EmptyState message="No hay anuncios publicados." />
       ) : (
         <section className="flex flex-col gap-4">
           {announcements.map((ann) => {

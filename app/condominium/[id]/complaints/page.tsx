@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Breadcrumb } from "@/components/Breadcrumb";
+import { PageHeader } from "@/components/PageHeader";
 import { useAuthContext } from "@/context/authContext";
 import { Button } from "@/components/Button";
 import { useCondominium, useUserCondominiumRole } from "@/lib/queries/useCondominium";
@@ -21,6 +22,7 @@ import {
   Building,
 } from "@/lib/types";
 import { PageSkeleton } from "@/components/skeleton";
+import { EmptyState } from "@/components/EmptyState";
 
 const STATUS_LABELS: Record<ComplaintStatus, string> = {
   pending: "Pendiente",
@@ -186,32 +188,24 @@ export default function ComplaintsPage() {
         ]}
       />
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Quejas
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            {condominium.name}
-          </p>
-        </div>
-        {canCreate && (
-          <Button
-            href={`/condominium/${condominium.id}/complaints/new`}
-            variant="primary"
-            size="lg"
-          >
-            Nueva queja
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Quejas"
+        subtitle={condominium.name}
+        action={
+          canCreate ? (
+            <Button
+              href={`/condominium/${condominium.id}/complaints/new`}
+              variant="primary"
+              size="lg"
+            >
+              Nueva queja
+            </Button>
+          ) : undefined
+        }
+      />
 
       {complaints.length === 0 ? (
-        <section className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-black">
-          <p className="text-zinc-500 dark:text-zinc-400">
-            No hay quejas registradas.
-          </p>
-        </section>
+        <EmptyState message="No hay quejas registradas." />
       ) : (
         <section className="flex flex-col gap-4">
           {complaints.map((complaint) => {

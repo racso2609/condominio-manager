@@ -1,27 +1,28 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
 import { Breadcrumb } from "@/components/Breadcrumb";
-import { useAuthContext } from "@/context/authContext";
-import { useCondominium, useCondominiumRoles } from "@/lib/queries/useCondominium";
+import { PageHeader } from "@/components/PageHeader";
+import { useCondominiumPage } from "@/hooks/useCondominiumPage";
+import { useCondominiumRoles } from "@/lib/queries/useCondominium";
 import {
   useCreateInvite,
   useCreateGlobalInvite,
 } from "@/lib/mutations/useCondominiumMutations";
 import { CondominiumRole } from "@/lib/types";
 import { InviteSkeleton } from "@/components/skeleton";
+import { PermissionDenied } from "@/components/PermissionDenied";
 
 const BASE_URL = typeof window !== "undefined" ? window.location.origin : "";
 
 export default function InviteResidentPage() {
-  const { appUser } = useAuthContext();
-  const params = useParams();
-  const router = useRouter();
-  const condominiumId = params.id as string;
-
-  const { data: condominium, isLoading: condominiumLoading } =
-    useCondominium(condominiumId);
+  const {
+    appUser,
+    condominiumId,
+    condominium,
+    condominiumLoading,
+    isAdminOrManager,
+  } = useCondominiumPage();
   const { data: roles = [], isLoading: rolesLoading } =
     useCondominiumRoles(condominiumId);
 
@@ -33,19 +34,10 @@ export default function InviteResidentPage() {
   const { mutate: createGlobalInvite, isPending: generatingGlobal } =
     useCreateGlobalInvite();
 
-  const isAdminOrManager =
-    appUser?.role === "admin" || appUser?.role === "administrator";
-
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(interval);
   }, []);
-
-  useEffect(() => {
-    if (!condominiumLoading && condominium === null) {
-      router.replace("/home");
-    }
-  }, [condominiumLoading, condominium, router]);
 
   const isExpired = (role: CondominiumRole) =>
     !!role.expires_at && new Date(role.expires_at).getTime() < now;
@@ -108,11 +100,7 @@ export default function InviteResidentPage() {
 
   if (!isAdminOrManager) {
     return (
-      <div className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
-        <p className="text-zinc-500 dark:text-zinc-400">
-          No tienes permisos para invitar residentes.
-        </p>
-      </div>
+      <PermissionDenied message="No tienes permisos para invitar residentes." />
     );
   }
 
@@ -126,14 +114,7 @@ export default function InviteResidentPage() {
         ]}
       />
 
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Invitar residente
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          {condominium.name}
-        </p>
-      </div>
+      <PageHeader title="Invitar residente" subtitle={condominium.name} />
 
       <form onSubmit={handleInvite} className="flex gap-3">
         <input
