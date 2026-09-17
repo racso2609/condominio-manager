@@ -105,6 +105,13 @@ export interface ExpenseEntry {
   updated_at: string;
 }
 
+export interface PaginatedExpenseEntries {
+  entries: (ExpenseEntry & { units?: Unit })[];
+  totalCount: number;
+  totalPages: number;
+  page: number;
+}
+
 export interface AnnouncementFile {
   name: string;
   url: string;

@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { generateStorageFileName } from "@/lib/utils/storage";
-import { ExpenseEntry } from "@/lib/types";
+import { ExpenseEntry, PaginatedExpenseEntries, Unit } from "@/lib/types";
 
 const TABLE = "expense_entries";
 const STORAGE_BUCKET = "condominios";
@@ -95,6 +95,33 @@ export async function getEntriesByExpense(
 
   if (error) throw error;
   return (data ?? []) as ExpenseEntry[];
+}
+
+export async function getEntriesByExpenseAndBuilding(
+  expenseId: string,
+  buildingId: string,
+  page = 1,
+  pageSize = 10
+): Promise<PaginatedExpenseEntries> {
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const { data, count, error } = await supabase
+    .from(TABLE)
+    .select("*, units!inner(*)", { count: "exact" })
+    .eq("expense", expenseId)
+    .eq("units.building", buildingId)
+    .order("created_at", { ascending: true })
+    .range(from, to);
+
+  if (error) throw error;
+  const totalCount = count ?? 0;
+  const totalPages = Math.ceil(totalCount / pageSize);
+  return {
+    entries: (data ?? []) as unknown as (ExpenseEntry & { units?: Unit })[],
+    totalCount,
+    totalPages,
+    page,
+  };
 }
 
 export async function getEntriesByUnit(

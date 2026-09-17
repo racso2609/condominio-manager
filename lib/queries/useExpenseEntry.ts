@@ -7,6 +7,7 @@ import {
 import {
   getExpenseEntry,
   getEntriesByExpense,
+  getEntriesByExpenseAndBuilding,
   getEntriesByUnit,
   getEntriesByUnits,
 } from "@/lib/services/expenseEntryService";
@@ -26,6 +27,32 @@ export function useEntriesByExpense(expenseId?: string) {
     queryKey: queryKeys.expenseEntries.byExpense(expenseId ?? ""),
     queryFn: expenseId ? () => getEntriesByExpense(expenseId) : skipToken,
     enabled: Boolean(expenseId),
+  });
+}
+
+export function useEntriesByExpenseAndBuilding(
+  expenseId?: string,
+  buildingId?: string,
+  page = 1,
+  pageSize = 10
+) {
+  return useQuery({
+    queryKey: queryKeys.expenseEntries.byExpenseAndBuilding(
+      expenseId ?? "",
+      buildingId ?? "",
+      page
+    ),
+    queryFn:
+      expenseId && buildingId
+        ? () =>
+            getEntriesByExpenseAndBuilding(
+              expenseId,
+              buildingId,
+              page,
+              pageSize
+            )
+        : skipToken,
+    enabled: Boolean(expenseId && buildingId),
   });
 }
 

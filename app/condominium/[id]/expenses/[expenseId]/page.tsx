@@ -11,7 +11,7 @@ import { useCondominium } from "@/lib/queries/useCondominium";
 import { useExpense } from "@/lib/queries/useExpense";
 import { useEntriesByExpense } from "@/lib/queries/useExpenseEntry";
 import { useUnits } from "@/lib/queries/useUnit";
-import { useBuildings } from "@/lib/queries/useBuilding";
+import { useBuildingsByCondominium } from "@/lib/queries/useBuilding";
 import { useUser } from "@/lib/queries/useUser";
 import { useMarkEntryAsPaid } from "@/lib/mutations/useExpenseEntryMutations";
 import { useRestoreExpense } from "@/lib/mutations/useExpenseMutations";
@@ -20,7 +20,7 @@ import {
   getCleanExpenseDescription,
 } from "@/lib/utils/expense";
 import { DeleteExpenseModal } from "@/components/DeleteExpenseModal";
-import PaymentOrderItem from "@/components/PaymentOrderItem";
+import BuildingExpenseEntriesList from "@/components/BuildingExpenseEntriesList";
 import { PageSkeleton } from "@/components/skeleton";
 import { PermissionDenied } from "@/components/PermissionDenied";
 
@@ -38,6 +38,8 @@ export default function ExpenseDetailPage() {
   const { data: expense, isLoading: expenseLoading } = useExpense(expenseId);
   const { data: entries = [], isLoading: entriesLoading } =
     useEntriesByExpense(expenseId);
+  const { data: buildings = [], isLoading: buildingsLoading } =
+    useBuildingsByCondominium(condominiumId);
 
   const cancellationInfo = useMemo(
     () => getExpenseCancellationInfo(expense),
@@ -55,16 +57,6 @@ export default function ExpenseDetailPage() {
   );
   const unitsQueries = useUnits(unitIds);
 
-  const buildingIds = useMemo(() => {
-    const ids = new Set<string>();
-    unitsQueries.forEach((q) => {
-      if (q.data) ids.add(q.data.building);
-    });
-    return Array.from(ids);
-  }, [unitsQueries]);
-
-  const buildingsQueries = useBuildings(buildingIds);
-
   const units = useMemo(() => {
     const map: Record<string, import("@/lib/types").Unit> = {};
     unitsQueries.forEach((q) => {
@@ -73,13 +65,13 @@ export default function ExpenseDetailPage() {
     return map;
   }, [unitsQueries]);
 
-  const buildings = useMemo(() => {
+  const buildingsMap = useMemo(() => {
     const map: Record<string, import("@/lib/types").Building> = {};
-    buildingsQueries.forEach((q) => {
-      if (q.data) map[q.data.id] = q.data;
+    buildings.forEach((b) => {
+      map[b.id] = b;
     });
     return map;
-  }, [buildingsQueries]);
+  }, [buildings]);
 
   const { mutate: markAsPaid, isPending: isValidating } = useMarkEntryAsPaid();
 
@@ -118,8 +110,8 @@ export default function ExpenseDetailPage() {
     condominiumLoading ||
     expenseLoading ||
     entriesLoading ||
-    unitsQueries.some((q) => q.isLoading) ||
-    buildingsQueries.some((q) => q.isLoading);
+    buildingsLoading ||
+    unitsQueries.some((q) => q.isLoading);
 
   if (loading) {
     return (
@@ -316,29 +308,13 @@ export default function ExpenseDetailPage() {
           )}
         </div>
 
-        {entries.length === 0 ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            {isCancelled
-              ? "No hubo pagos registrados para este gasto antes de su anulación."
-              : "No hay unidades asignadas a este gasto."}
-          </p>
-        ) : (
-          entries.map((entry) => {
-            const unit = units[entry.unit];
-            return (
-              <PaymentOrderItem
-                key={entry.id}
-                entry={entry}
-                expense={expense}
-                unit={unit}
-                building={unit ? buildings[unit.building] : undefined}
-                showValidateForm={!isCancelled || entry.status === "pending_validation"}
-                onValidate={(note) => handleValidate(entry.id, note)}
-                isValidating={isValidating}
-              />
-            );
-          })
-        )}
+        <BuildingExpenseEntriesList
+          buildings={buildings}
+          expense={expense}
+          isCancelled={isCancelled}
+          onValidate={handleValidate}
+          isValidating={isValidating}
+        />
       </section>
 
       {/* Delete / Cancel Expense Modal */}
@@ -349,7 +325,7 @@ export default function ExpenseDetailPage() {
           expense={expense}
           entries={entries}
           units={units}
-          buildings={buildings}
+          buildings={buildingsMap}
           currentUserId={appUser.id}
           onSuccess={(wasCancelled) => {
             if (!wasCancelled) {
