@@ -13,6 +13,7 @@ import {
   useExpensesByBuildings,
 } from "@/lib/queries/useExpense";
 import { useEntriesByExpenses } from "@/lib/queries/useExpenseEntry";
+import { isExpenseCancelled } from "@/lib/utils/expense";
 import { usePaymentMethodsByCondominium } from "@/lib/queries/usePaymentMethod";
 import {
   useRejectUnitClaim,
@@ -223,7 +224,11 @@ export default function ResidentsPage() {
     const entries: ExpenseEntry[] = [];
     for (const u of units) {
       const unitEntries = entriesByUnit[u.id] ?? [];
-      entries.push(...unitEntries.filter((e) => e.status !== "paid"));
+      entries.push(
+        ...unitEntries.filter(
+          (e) => e.status !== "paid" && !isExpenseCancelled(expenses[e.expense])
+        )
+      );
     }
     return entries;
   };

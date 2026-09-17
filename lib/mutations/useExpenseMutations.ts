@@ -5,6 +5,9 @@ import {
   createExpense,
   updateExpense,
   deleteExpense,
+  cancelExpense,
+  restoreExpense,
+  CancelExpenseInput,
 } from "@/lib/services/expenseService";
 import { queryKeys } from "@/lib/queries/keys";
 
@@ -53,6 +56,50 @@ export function useUpdateExpense() {
   });
 }
 
+export function useCancelExpense() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: CancelExpenseInput;
+    }) => cancelExpense(id, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.expenses.all(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.expenses.detail(variables.id),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.expenseEntries.all(),
+      });
+    },
+  });
+}
+
+export function useRestoreExpense() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => restoreExpense(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.expenses.all(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.expenses.detail(id),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.expenseEntries.all(),
+      });
+    },
+  });
+}
+
 export function useDeleteExpense() {
   const queryClient = useQueryClient();
 
@@ -68,3 +115,4 @@ export function useDeleteExpense() {
     },
   });
 }
+

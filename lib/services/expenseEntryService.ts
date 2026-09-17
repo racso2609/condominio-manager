@@ -198,3 +198,19 @@ export async function deleteEntriesByExpense(
   const { error } = await supabase.from(TABLE).delete().eq("expense", expenseId);
   if (error) throw error;
 }
+
+export async function deleteUnpaidEntriesByExpense(
+  expenseId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from(TABLE)
+    .delete()
+    .eq("expense", expenseId)
+    .in("status", ["pending", "overdue", "cancelled"])
+    .is("payment_reference", null)
+    .is("payment_proof_url", null)
+    .is("paid_at", null);
+
+  if (error) throw error;
+}
+

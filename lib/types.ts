@@ -62,6 +62,8 @@ export interface ExpenseItem {
   amount: number;
 }
 
+export type ExpenseStatus = "active" | "cancelled";
+
 export interface Expense {
   id: string;
   condominium?: string;
@@ -73,6 +75,10 @@ export interface Expense {
   due_date: string;
   period_start?: string;
   period_end?: string;
+  status?: ExpenseStatus;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+  delete_reason?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -82,7 +88,7 @@ export interface ExpenseEntry {
   expense: string;
   unit: string;
   amount: number;
-  status: "pending" | "pending_validation" | "paid" | "overdue";
+  status: "pending" | "pending_validation" | "paid" | "overdue" | "cancelled";
   paid_at: string | null;
   payment_method_id?: string | null;
   payment_reference?: string | null;

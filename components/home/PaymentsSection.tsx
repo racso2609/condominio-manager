@@ -3,6 +3,7 @@
 import Link from "next/link";
 import PaymentOrderItem from "@/components/PaymentOrderItem";
 import { ExpenseEntry, Unit, Building, Expense } from "@/lib/types";
+import { isExpenseCancelled } from "@/lib/utils/expense";
 
 interface PaymentsSectionProps {
   paymentEntries: ExpenseEntry[];
@@ -20,7 +21,9 @@ export function PaymentsSection({
   condominiumNames,
 }: PaymentsSectionProps) {
   const pendingEntries = paymentEntries.filter(
-    (e) => e.status === "pending" || e.status === "pending_validation"
+    (e) =>
+      (e.status === "pending" || e.status === "pending_validation") &&
+      !isExpenseCancelled(paymentExpenses[e.expense])
   );
 
   const totalPending = pendingEntries.reduce((sum, e) => sum + e.amount, 0);

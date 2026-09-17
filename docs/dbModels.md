@@ -64,11 +64,16 @@ expense:
 - due_date
 - period_start
 - period_end
+- status: "active" | "cancelled"
+- deleted_at (timestamptz, optional)
+- deleted_by (FK → user.id, optional)
+- delete_reason (optional)
 - created_at
 - updated_at
 
 > One of `condominium` or `building` must be set (mutually exclusive). If `building` is set, the expense is for that specific building within the condominium. If `condominium` is set, the expense is for the entire condominium.
 > `amount` is the total of the expense. When `items` is provided, `amount` is calculated as the sum of the line items.
+> When an expense with tenant payments is deleted or cancelled, it transitions to `status: "cancelled"` preserving payment records as evidence, and sets `deleted_at`, `deleted_by`, and `delete_reason`.
 
 announcement:
 

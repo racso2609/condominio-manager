@@ -15,6 +15,7 @@ import {
 import { usePaymentMethodsByCondominium } from "@/lib/queries/usePaymentMethod";
 import { useReportPayment } from "@/lib/mutations/useExpenseEntryMutations";
 import { generatePaymentReceipt } from "@/lib/utils/receipt";
+import { isExpenseCancelled } from "@/lib/utils/expense";
 import { PaymentMethodCard } from "@/components/PaymentMethodCard";
 import PaymentOrderItem from "@/components/PaymentOrderItem";
 import { PaymentsSkeleton } from "@/components/skeleton";
@@ -162,7 +163,9 @@ export default function ResidentPagosPage() {
   };
 
   const pendingEntries = entries.filter(
-    (e) => e.status === "pending" || e.status === "pending_validation"
+    (e) =>
+      (e.status === "pending" || e.status === "pending_validation") &&
+      !isExpenseCancelled(expenses[e.expense])
   );
   const paidEntries = entries.filter((e) => e.status === "paid");
   const totalPending = pendingEntries.reduce((s, e) => s + e.amount, 0);

@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { Expense, ExpenseItem } from "@/lib/types";
+import { deleteUnpaidEntriesByExpense } from "./expenseEntryService";
 
 const TABLE = "expenses";
 
@@ -138,7 +139,101 @@ export async function updateExpense(
   if (error) throw error;
 }
 
+export interface CancelExpenseInput {
+  deleted_by: string;
+  reason?: string;
+}
+
+export async function cancelExpense(
+  id: string,
+  data: CancelExpenseInput
+): Promise<void> {
+  const now = new Date().toISOString();
+  const reason = data.reason?.trim() || "Eliminado por la administración";
+
+  // 1. Attempt native columns update
+  const { error: nativeError } = await supabase
+    .from(TABLE)
+    .update({
+      status: "cancelled",
+      deleted_at: now,
+      deleted_by: data.deleted_by,
+      delete_reason: reason,
+      updated_at: now,
+    })
+    .eq("id", id);
+
+  if (nativeError) {
+    // If native columns don't exist yet (e.g. migration 003 hasn't run in Supabase SQL editor):
+    // Fall back to annotating the description with structured metadata
+    const { data: currentExpense } = await supabase
+      .from(TABLE)
+      .select("description")
+      .eq("id", id)
+      .single();
+
+    const tag = `[ANULADO: ${now} | por: ${data.deleted_by} | motivo: ${reason}]`;
+    const updatedDesc = currentExpense?.description
+      ? `${tag}\n\n${currentExpense.description}`
+      : tag;
+
+    const { error: fallbackError } = await supabase
+      .from(TABLE)
+      .update({
+        description: updatedDesc,
+        updated_at: now,
+      })
+      .eq("id", id);
+
+    if (fallbackError) throw fallbackError;
+  }
+
+  // 2. Delete all unpaid entries (without payments or payment proofs) to prevent cluttering the database.
+  // Entries that were paid or pending_validation (or have proof/reference) are PRESERVED as evidence.
+  await deleteUnpaidEntriesByExpense(id);
+}
+
+export async function restoreExpense(id: string): Promise<void> {
+  const now = new Date().toISOString();
+
+  // Try native column restore
+  const { error: nativeError } = await supabase
+    .from(TABLE)
+    .update({
+      status: "active",
+      deleted_at: null,
+      deleted_by: null,
+      delete_reason: null,
+      updated_at: now,
+    })
+    .eq("id", id);
+
+  if (nativeError) {
+    // Fallback: clean description tag
+    const { data: currentExpense } = await supabase
+      .from(TABLE)
+      .select("description")
+      .eq("id", id)
+      .single();
+
+    if (currentExpense?.description) {
+      const cleanDesc = currentExpense.description
+        .replace(/^\[ANULADO:[^\]]*\]\s*/i, "")
+        .trim();
+
+      await supabase
+        .from(TABLE)
+        .update({
+          description: cleanDesc || null,
+          updated_at: now,
+        })
+        .eq("id", id);
+    }
+  }
+}
+
 export async function deleteExpense(id: string): Promise<void> {
   const { error } = await supabase.from(TABLE).delete().eq("id", id);
   if (error) throw error;
 }
+

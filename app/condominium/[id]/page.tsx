@@ -9,6 +9,8 @@ import { useUserCondominiumRole } from "@/lib/queries/useCondominium";
 import { useBuildingsByCondominium } from "@/lib/queries/useBuilding";
 import { useUnitsByBuildings } from "@/lib/queries/useUnit";
 import { useEntriesByUnits } from "@/lib/queries/useExpenseEntry";
+import { useExpensesByCondominium } from "@/lib/queries/useExpense";
+import { isExpenseCancelled } from "@/lib/utils/expense";
 import { useUpdateCondominiumStatus } from "@/lib/mutations/useCondominiumMutations";
 import StatusBadge from "@/components/StatusBadge";
 import { CondominiumDetailSkeleton } from "@/components/skeleton";
@@ -40,6 +42,14 @@ export default function CondominiumDetail() {
   const unitIds = useMemo(() => units.map((u) => u.id), [units]);
   const { data: entries = [], isLoading: entriesLoading } =
     useEntriesByUnits(unitIds);
+  const { data: condoExpenses = [] } =
+    useExpensesByCondominium(condominiumId);
+
+  const expenseMap = useMemo(() => {
+    const map: Record<string, import("@/lib/types").Expense> = {};
+    condoExpenses.forEach((e) => (map[e.id] = e));
+    return map;
+  }, [condoExpenses]);
 
   const { mutate: updateStatus, isPending: changingStatus } =
     useUpdateCondominiumStatus();
@@ -78,7 +88,11 @@ export default function CondominiumDetail() {
   }
 
   const pendingAmount = entries
-    .filter((e) => e.status === "pending" || e.status === "pending_validation")
+    .filter(
+      (e) =>
+        (e.status === "pending" || e.status === "pending_validation") &&
+        !isExpenseCancelled(expenseMap[e.expense])
+    )
     .reduce((sum, e) => sum + e.amount, 0);
 
   return (
