@@ -206,7 +206,7 @@ export async function deleteUnpaidEntriesByExpense(
     .from(TABLE)
     .delete()
     .eq("expense", expenseId)
-    .in("status", ["pending", "overdue", "cancelled"])
+    .in("status", ["pending", "overdue"])
     .is("payment_reference", null)
     .is("payment_proof_url", null)
     .is("paid_at", null);

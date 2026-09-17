@@ -25,9 +25,10 @@ END $$;
 -- Delete all unpaid entries for cancelled expenses to avoid filling the database with dead records
 DELETE FROM expense_entries
 WHERE expense IN (SELECT id FROM expenses WHERE status = 'cancelled')
-  AND status IN ('pending', 'overdue', 'cancelled')
+  AND status IN ('pending', 'overdue')
   AND payment_reference IS NULL
   AND payment_proof_url IS NULL
   AND paid_at IS NULL;
+
 
 

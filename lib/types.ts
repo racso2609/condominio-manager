@@ -91,7 +91,7 @@ export interface ExpenseEntry {
   expense: string;
   unit: string;
   amount: number;
-  status: "pending" | "pending_validation" | "paid" | "overdue" | "cancelled";
+  status: "pending" | "pending_validation" | "paid" | "overdue";
   paid_at: string | null;
   payment_method_id?: string | null;
   payment_reference?: string | null;
