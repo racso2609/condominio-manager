@@ -34,13 +34,15 @@ export function useEntriesByExpenseAndBuilding(
   expenseId?: string,
   buildingId?: string,
   page = 1,
-  pageSize = 10
+  pageSize = 10,
+  search?: string
 ) {
   return useQuery({
     queryKey: queryKeys.expenseEntries.byExpenseAndBuilding(
       expenseId ?? "",
       buildingId ?? "",
-      page
+      page,
+      search
     ),
     queryFn:
       expenseId && buildingId
@@ -49,7 +51,8 @@ export function useEntriesByExpenseAndBuilding(
               expenseId,
               buildingId,
               page,
-              pageSize
+              pageSize,
+              search
             )
         : skipToken,
     enabled: Boolean(expenseId && buildingId),

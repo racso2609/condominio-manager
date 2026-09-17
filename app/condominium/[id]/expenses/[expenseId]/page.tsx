@@ -32,6 +32,20 @@ export default function ExpenseDetailPage() {
   const expenseId = params.expenseId as string;
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleClearSearch = () => {
+    setSearchQuery("");
+    setDebouncedSearch("");
+  };
 
   const { data: condominium, isLoading: condominiumLoading } =
     useCondominium(condominiumId);
@@ -308,9 +322,62 @@ export default function ExpenseDetailPage() {
           )}
         </div>
 
+        {/* Search input */}
+        <div className="relative flex items-center">
+          <svg
+            className="pointer-events-none absolute left-3.5 h-4 w-4 text-zinc-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"
+            />
+          </svg>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                handleClearSearch();
+              }
+            }}
+            placeholder="Buscar por apto, residente, recibo o referencia..."
+            className="h-10 w-full rounded-xl border border-zinc-200 bg-white pl-10 pr-10 text-sm text-zinc-900 placeholder-zinc-400 outline-none transition-colors focus:border-zinc-400 dark:border-zinc-800 dark:bg-black dark:text-zinc-50 dark:placeholder-zinc-600 dark:focus:border-zinc-700"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={handleClearSearch}
+              aria-label="Limpiar búsqueda"
+              className="absolute right-3 rounded-full p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+            >
+              <svg
+                className="h-3.5 w-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          )}
+        </div>
+
         <BuildingExpenseEntriesList
           buildings={buildings}
           expense={expense}
+          search={debouncedSearch}
+          onClearSearch={handleClearSearch}
           isCancelled={isCancelled}
           onValidate={handleValidate}
           isValidating={isValidating}

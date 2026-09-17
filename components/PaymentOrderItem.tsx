@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Expense, ExpenseEntry, Unit, Building } from "@/lib/types";
+import { Expense, ExpenseEntry, Unit, Building, AppUser } from "@/lib/types";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Pendiente",
@@ -15,6 +15,7 @@ interface PaymentOrderItemProps {
   expense?: Expense;
   unit?: Unit;
   building?: Building;
+  owner?: AppUser | null;
   showReportButton?: boolean;
   onReport?: () => void;
   showValidateForm?: boolean;
@@ -29,6 +30,7 @@ export default function PaymentOrderItem({
   expense,
   unit,
   building,
+  owner,
   showReportButton,
   onReport,
   showValidateForm,
@@ -38,6 +40,8 @@ export default function PaymentOrderItem({
   vesAmount,
 }: PaymentOrderItemProps) {
   const [note, setNote] = useState(entry.notes ?? "");
+  const resolvedOwner =
+    owner ?? (unit as (Unit & { owner_user?: AppUser | null }) | undefined)?.owner_user;
 
   const canReport =
     showReportButton &&
@@ -55,12 +59,20 @@ export default function PaymentOrderItem({
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
-          <p className="font-medium text-zinc-900 dark:text-zinc-50">
-            {expense?.title ?? "Gasto"}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-zinc-900 dark:text-zinc-50">
+              {expense?.title ?? "Gasto"}
+            </p>
+            {entry.id && (
+              <span className="font-mono text-xs text-zinc-400 dark:text-zinc-500">
+                #{entry.id.slice(0, 8).toUpperCase()}
+              </span>
+            )}
+          </div>
           <p className="mt-0.5 text-xs text-zinc-500">
             {unit ? `Unidad ${unit.num}` : "Unidad —"}
             {unit && building ? ` · ${building.name}` : ""}
+            {resolvedOwner?.name ? ` · Propietario: ${resolvedOwner.name}` : ""}
           </p>
           {expense?.due_date && (
             <p className="mt-0.5 text-xs text-zinc-400">

@@ -7,19 +7,34 @@ export default function Collapse({
   subtitle,
   badge,
   defaultOpen = false,
+  isOpen,
+  forceOpen,
   children,
 }: PropsWithChildren<{
   title: string;
   subtitle?: string;
   badge?: ReactNode;
   defaultOpen?: boolean;
+  isOpen?: boolean;
+  forceOpen?: boolean;
 }>) {
-  const [open, setOpen] = useState(defaultOpen);
+  const effectiveControlled = isOpen !== undefined ? isOpen : forceOpen;
+  const [prevEffective, setPrevEffective] = useState(effectiveControlled);
+  const [open, setOpen] = useState(
+    effectiveControlled !== undefined ? effectiveControlled : defaultOpen
+  );
+
+  if (effectiveControlled !== prevEffective) {
+    setPrevEffective(effectiveControlled);
+    setOpen(
+      effectiveControlled !== undefined ? effectiveControlled : defaultOpen
+    );
+  }
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black">
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => setOpen((prev) => !prev)}
         className="flex w-full items-center gap-4 px-5 py-4 text-left"
       >
         <svg

@@ -44,8 +44,21 @@ export const queryKeys = {
     all: () => ["expenseEntries"] as const,
     byExpense: (expenseId: string) =>
       ["expenseEntries", "expense", expenseId] as const,
-    byExpenseAndBuilding: (expenseId: string, buildingId: string, page: number) =>
-      ["expenseEntries", "expense", expenseId, "building", buildingId, page] as const,
+    byExpenseAndBuilding: (
+      expenseId: string,
+      buildingId: string,
+      page: number,
+      search?: string
+    ) =>
+      [
+        "expenseEntries",
+        "expense",
+        expenseId,
+        "building",
+        buildingId,
+        page,
+        search ?? "",
+      ] as const,
     byUnit: (unitId: string) => ["expenseEntries", "unit", unitId] as const,
     byUnits: (unitIds: string[]) =>
       ["expenseEntries", "units", unitIds.sort().join(",")] as const,

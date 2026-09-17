@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { generateStorageFileName } from "@/lib/utils/storage";
-import { ExpenseEntry, PaginatedExpenseEntries, Unit } from "@/lib/types";
+import { ExpenseEntry, PaginatedExpenseEntries } from "@/lib/types";
 
 const TABLE = "expense_entries";
 const STORAGE_BUCKET = "condominios";
@@ -101,15 +101,102 @@ export async function getEntriesByExpenseAndBuilding(
   expenseId: string,
   buildingId: string,
   page = 1,
-  pageSize = 10
+  pageSize = 10,
+  search?: string
 ): Promise<PaginatedExpenseEntries> {
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
-  const { data, count, error } = await supabase
+
+  const trimmed = search?.trim();
+  const safe = trimmed
+    ? trimmed.replace(/[,()%"'\\]/g, " ").replace(/\s+/g, " ").trim()
+    : "";
+  const cleaned = safe
+    ? safe
+        .replace(
+          /^(apto\.?|apartamento|unidad|depto\.?|recibo\s*#?|ref\.?|#)\s*/i,
+          ""
+        )
+        .trim()
+    : "";
+
+  let matchedUnitIds: string[] = [];
+  let matchedUserIds: string[] = [];
+
+  if (safe.length > 0) {
+    const unitNumQuery = supabase
+      .from("units")
+      .select("id")
+      .eq("building", buildingId)
+      .ilike("num", `%${cleaned || safe}%`);
+
+    const userQuery = supabase
+      .from("users")
+      .select("id")
+      .or(
+        `name.ilike.%${safe}%,email.ilike.%${safe}%,document_id.ilike.%${safe}%`
+      );
+
+    const [unitsNumRes, usersRes] = await Promise.all([
+      unitNumQuery,
+      userQuery,
+    ]);
+
+    if (unitsNumRes.error) throw unitsNumRes.error;
+    if (usersRes.error) throw usersRes.error;
+
+    matchedUserIds = (usersRes.data ?? []).map((u) => u.id);
+
+    let matchedUnitsByOwner: { id: string }[] = [];
+    if (matchedUserIds.length > 0) {
+      const { data: unitsByOwner, error: ownerUnitsError } = await supabase
+        .from("units")
+        .select("id")
+        .eq("building", buildingId)
+        .in("owner", matchedUserIds);
+
+      if (ownerUnitsError) throw ownerUnitsError;
+      matchedUnitsByOwner = unitsByOwner ?? [];
+    }
+
+    matchedUnitIds = Array.from(
+      new Set([
+        ...(unitsNumRes.data ?? []).map((u) => u.id),
+        ...matchedUnitsByOwner.map((u) => u.id),
+      ])
+    );
+  }
+
+  let query = supabase
     .from(TABLE)
-    .select("*, units!inner(*)", { count: "exact" })
+    .select("*, units!inner(*, owner_user:users(*))", { count: "exact" })
     .eq("expense", expenseId)
-    .eq("units.building", buildingId)
+    .eq("units.building", buildingId);
+
+  if (safe.length > 0) {
+    const orClauses: string[] = [
+      `payment_reference.ilike.%${safe}%`,
+      `notes.ilike.%${safe}%`,
+      `id.ilike.%${cleaned || safe}%`,
+    ];
+
+    if (cleaned && cleaned !== safe) {
+      orClauses.push(`payment_reference.ilike.%${cleaned}%`);
+      orClauses.push(`notes.ilike.%${cleaned}%`);
+    }
+
+    if (matchedUnitIds.length > 0) {
+      orClauses.push(`unit.in.(${matchedUnitIds.join(",")})`);
+    }
+
+    if (matchedUserIds.length > 0) {
+      orClauses.push(`reported_by.in.(${matchedUserIds.join(",")})`);
+    }
+
+    query = query.or(orClauses.join(","));
+  }
+
+  const { data, count, error } = await query
     .order("created_at", { ascending: true })
     .range(from, to);
 
@@ -117,7 +204,7 @@ export async function getEntriesByExpenseAndBuilding(
   const totalCount = count ?? 0;
   const totalPages = Math.ceil(totalCount / pageSize);
   return {
-    entries: (data ?? []) as unknown as (ExpenseEntry & { units?: Unit })[],
+    entries: (data ?? []) as unknown as PaginatedExpenseEntries["entries"],
     totalCount,
     totalPages,
     page,

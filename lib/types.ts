@@ -106,7 +106,9 @@ export interface ExpenseEntry {
 }
 
 export interface PaginatedExpenseEntries {
-  entries: (ExpenseEntry & { units?: Unit })[];
+  entries: (ExpenseEntry & {
+    units?: Unit & { owner_user?: AppUser | null };
+  })[];
   totalCount: number;
   totalPages: number;
   page: number;
