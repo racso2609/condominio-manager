@@ -1,8 +1,11 @@
 export interface AppUser {
   id: string;
   name: string;
-  email: string;
-  phone?: string;
+  email?: string | null;
+  phone?: string | null;
+  document_id?: string | null;
+  notes?: string | null;
+  is_preregistered?: boolean;
   role: "admin" | "user" | "administrator";
   photoURL?: string | null;
   created_at: string;

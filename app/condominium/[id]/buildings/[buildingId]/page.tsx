@@ -19,6 +19,9 @@ import {
 import { BuildingDetailSkeleton } from "@/components/skeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/Badge";
+import { useCondominiumRoles } from "@/lib/queries/useCondominium";
+import { AssignOrPreregisterModal } from "@/components/AssignOrPreregisterModal";
+import { AppUser, Unit } from "@/lib/types";
 
 export default function BuildingDetail() {
   const { appUser } = useAuthContext();
@@ -51,10 +54,32 @@ export default function BuildingDetail() {
     return map;
   }, [ownersQueries]);
 
+  const { data: condoRoles = [] } = useCondominiumRoles(condominiumId);
+  const residentUserIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          condoRoles
+            .map((r) => r.user)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ),
+    [condoRoles],
+  );
+  const residentUsersQueries = useUsers(residentUserIds);
+  const existingResidents = useMemo(
+    () =>
+      residentUsersQueries
+        .map((q) => q.data)
+        .filter((u): u is AppUser => Boolean(u)),
+    [residentUsersQueries],
+  );
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectMode, setSelectMode] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [assignModalUnit, setAssignModalUnit] = useState<Unit | null>(null);
 
   const { mutate: deleteBuilding, isPending: deletingBuilding } =
     useDeleteBuilding();
@@ -341,19 +366,22 @@ export default function BuildingDetail() {
                           {u.type === "residential" ? "Hab." : "Ofi."}
                         </Badge>
                         {u.owner && owners[u.owner] && (
-                          <span className="ml-auto text-xs text-zinc-500 dark:text-zinc-400">
-                            {owners[u.owner]?.name}
+                          <div className="ml-auto flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                            <span>{owners[u.owner]?.name}</span>
                             {owners[u.owner]?.phone && (
-                              <span className="ml-1 text-zinc-400">
+                              <span className="text-zinc-400">
                                 · {owners[u.owner]?.phone}
                               </span>
                             )}
+                            {owners[u.owner]?.is_preregistered && (
+                              <Badge color="zinc">Offline</Badge>
+                            )}
                             {u.owner_status === "pending" && (
-                              <span className="ml-1 text-amber-500">
+                              <span className="text-amber-500">
                                 (Pendiente)
                               </span>
                             )}
-                          </span>
+                          </div>
                         )}
                         {u.claim_blocked_until &&
                           new Date(u.claim_blocked_until).getTime() >
@@ -362,7 +390,16 @@ export default function BuildingDetail() {
                               Bloqueada
                             </span>
                           )}
+                        {!u.owner && isAdminOrManager && (
+                          <button
+                            onClick={() => setAssignModalUnit(u)}
+                            className="ml-auto h-7 rounded-full border border-zinc-300 bg-white px-3 text-xs font-medium text-zinc-800 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                          >
+                            + Asignar / Preregistrar
+                          </button>
+                        )}
                         {!u.owner &&
+                          !isAdminOrManager &&
                           appUser &&
                           !(
                             u.claim_blocked_until &&
@@ -407,6 +444,17 @@ export default function BuildingDetail() {
             });
           })()}
         </div>
+      )}
+
+      {assignModalUnit && building && (
+        <AssignOrPreregisterModal
+          isOpen={Boolean(assignModalUnit)}
+          onClose={() => setAssignModalUnit(null)}
+          unit={assignModalUnit}
+          building={building}
+          condominiumId={condominiumId}
+          existingResidents={existingResidents}
+        />
       )}
     </div>
   );

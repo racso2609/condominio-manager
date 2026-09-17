@@ -45,13 +45,15 @@ export async function createUser(
 
 export async function updateUser(
   id: string,
-  data: Partial<Pick<AppUser, "name" | "photoURL" | "role" | "phone">>
+  data: Partial<Pick<AppUser, "name" | "photoURL" | "role" | "phone" | "document_id" | "notes">>
 ): Promise<void> {
   const mapped: Record<string, unknown> = {};
   if (data.name !== undefined) mapped.name = data.name;
   if (data.photoURL !== undefined) mapped.photo_url = data.photoURL;
   if (data.role !== undefined) mapped.role = data.role;
   if (data.phone !== undefined) mapped.phone = data.phone;
+  if (data.document_id !== undefined) mapped.document_id = data.document_id;
+  if (data.notes !== undefined) mapped.notes = data.notes;
 
   const { error } = await supabase
     .from(TABLE)
@@ -59,6 +61,33 @@ export async function updateUser(
     .eq("id", id);
 
   if (error) throw error;
+}
+
+export interface PreregisterResidentParams {
+  condominiumId: string;
+  unitId: string;
+  name: string;
+  phone: string;
+  documentId?: string;
+  email?: string;
+  notes?: string;
+}
+
+export async function preregisterResident(
+  params: PreregisterResidentParams
+): Promise<{ userId: string; roleId: string; unitId: string }> {
+  const { data, error } = await supabase.rpc("preregister_resident", {
+    p_condominium_id: params.condominiumId,
+    p_unit_id: params.unitId,
+    p_name: params.name.trim(),
+    p_phone: params.phone.trim(),
+    p_document_id: params.documentId?.trim() || null,
+    p_email: params.email?.trim() || null,
+    p_notes: params.notes?.trim() || null,
+  });
+
+  if (error) throw error;
+  return data as { userId: string; roleId: string; unitId: string };
 }
 
 export async function getUserByEmail(email: string): Promise<AppUser | null> {

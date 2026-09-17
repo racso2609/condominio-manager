@@ -78,7 +78,7 @@ export function usePendingRoles(condominiumId?: string) {
   });
 }
 
-export function usePendingInvitesByEmail(email?: string) {
+export function usePendingInvitesByEmail(email?: string | null) {
   return useQuery({
     queryKey: queryKeys.condominiums.pendingInvites(email ?? ""),
     queryFn: email ? () => getPendingInvitesByEmail(email) : skipToken,

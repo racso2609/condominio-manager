@@ -31,6 +31,7 @@ import {
   Unit,
   Building,
   ExpenseEntry,
+  AppUser,
 } from "@/lib/types";
 import { PaymentMethodCard } from "@/components/PaymentMethodCard";
 import { Badge } from "@/components/Badge";
@@ -40,6 +41,11 @@ import PaymentOrderItem from "@/components/PaymentOrderItem";
 import { ResidentsSkeleton } from "@/components/skeleton";
 import { PermissionDenied } from "@/components/PermissionDenied";
 import { FormField, Select } from "@/components/Form";
+import { EditResidentContactModal } from "@/components/EditResidentContactModal";
+import {
+  buildResidentAccountSummaryText,
+  buildWhatsAppLink,
+} from "@/lib/utils/whatsapp";
 
 export default function ResidentsPage() {
   const {
@@ -133,6 +139,14 @@ export default function ResidentsPage() {
   const [assignBuildingId, setAssignBuildingId] = useState("");
   const [assignUnitId, setAssignUnitId] = useState("");
   const [removingUnitId, setRemovingUnitId] = useState<string | null>(null);
+  const [editingResident, setEditingResident] = useState<AppUser | null>(null);
+  const [copiedResidentId, setCopiedResidentId] = useState<string | null>(null);
+
+  const handleCopySummary = (roleId: string, summaryText: string) => {
+    navigator.clipboard.writeText(summaryText);
+    setCopiedResidentId(roleId);
+    setTimeout(() => setCopiedResidentId(null), 2500);
+  };
 
   const { mutate: rejectUnitClaim, isPending: rejecting } = useRejectUnitClaim();
   const { mutate: removeUnitOwner, isPending: removing } = useRemoveUnitOwner();
@@ -393,17 +407,43 @@ export default function ResidentsPage() {
             const units = unitsByOwner[r.user] ?? [];
             const pendingEntries = getPendingEntriesForOwner(r.user);
             const totalPending = getTotalPendingForOwner(r.user);
+
+            const subtitleItems: string[] = [];
+            if (owner?.email) subtitleItems.push(owner.email);
+            if (owner?.phone) subtitleItems.push(owner.phone);
+            if (owner?.document_id) subtitleItems.push(`ID: ${owner.document_id}`);
+            const subtitleText =
+              subtitleItems.length > 0
+                ? subtitleItems.join(" · ")
+                : r.invited_email ?? "";
+
+            const unitsText = units
+              .map(
+                (u) => `${buildingsMap[u.building]?.name ?? ""} / ${u.num}`
+              )
+              .join(", ");
+
+            const summaryText = buildResidentAccountSummaryText({
+              condominiumName: condominium.name,
+              residentName: owner?.name ?? r.invited_email ?? "Residente",
+              unitsText: unitsText || "Sin unidad asignada",
+              pendingEntries,
+              expenses,
+              paymentMethods,
+            });
+
+            const whatsappUrl = buildWhatsAppLink(owner?.phone, summaryText);
+
             return (
               <Collapse
                 key={r.id}
                 title={owner?.name ?? r.invited_email ?? "Pendiente"}
-                subtitle={
-                  owner?.email
-                    ? [owner.email, owner.phone].filter(Boolean).join(" · ")
-                    : r.invited_email ?? ""
-                }
+                subtitle={subtitleText}
                 badge={
                   <div className="flex items-center gap-2">
+                    {owner?.is_preregistered && (
+                      <Badge color="zinc">Offline</Badge>
+                    )}
                     {totalPending > 0 && (
                       <Badge color="amber">${totalPending.toFixed(2)} pendiente</Badge>
                     )}
@@ -416,6 +456,54 @@ export default function ResidentsPage() {
                   </div>
                 }
               >
+                <div className="flex flex-col gap-4">
+                  {/* Actions & WhatsApp Toolbar */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-100 bg-zinc-50 p-3 dark:border-zinc-800/80 dark:bg-zinc-900/50">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {whatsappUrl ? (
+                        <a
+                          href={whatsappUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-500"
+                        >
+                          <span>💬 Enviar WhatsApp</span>
+                        </a>
+                      ) : (
+                        <span className="text-[11px] text-zinc-400">
+                          (Sin teléfono para WhatsApp)
+                        </span>
+                      )}
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="xs"
+                        onClick={() => handleCopySummary(r.id, summaryText)}
+                      >
+                        {copiedResidentId === r.id
+                          ? "✓ ¡Copiado!"
+                          : "📋 Copiar resumen"}
+                      </Button>
+                    </div>
+
+                    {owner && isAdminOrManager && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="xs"
+                        onClick={() => setEditingResident(owner)}
+                      >
+                        ✏️ Editar contacto
+                      </Button>
+                    )}
+                  </div>
+
+                  {owner?.notes && (
+                    <div className="rounded-xl border border-amber-200/60 bg-amber-50/50 px-4 py-2.5 text-xs text-amber-900 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-300">
+                      <span className="font-medium">Nota administrativa:</span>{" "}
+                      {owner.notes}
+                    </div>
+                  )}
                 {units.length === 0 ? (
                   <div className="flex flex-col gap-3">
                     <p className="text-sm text-zinc-400">
@@ -600,11 +688,20 @@ export default function ResidentsPage() {
                     </div>
                   </div>
                 )}
+                </div>
               </Collapse>
             );
           })}
         </div>
       </section>
+
+      {editingResident && (
+        <EditResidentContactModal
+          isOpen={Boolean(editingResident)}
+          onClose={() => setEditingResident(null)}
+          resident={editingResident}
+        />
+      )}
     </div>
   );
 }
