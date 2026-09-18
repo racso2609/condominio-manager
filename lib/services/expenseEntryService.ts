@@ -134,7 +134,7 @@ export async function getEntriesByExpenseAndBuilding(
       .from("users")
       .select("id")
       .or(
-        `name.ilike.%${safe}%,email.ilike.%${safe}%,document_id.ilike.%${safe}%`
+        `name.ilike.%${safe}%,email.ilike.%${safe}%,phone.ilike.%${safe}%`
       );
 
     const [unitsNumRes, usersRes] = await Promise.all([
