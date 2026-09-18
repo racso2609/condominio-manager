@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
@@ -236,6 +237,12 @@ export default function BuildingDetail() {
             >
               Duplicar
             </Button>
+            <Link
+              href={`/condominium/${condominiumId}/buildings/${building.id}/aliquots`}
+              className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              Alícuotas
+            </Link>
             <button
               onClick={handleDeleteBuilding}
               disabled={deletingBuilding}

@@ -49,6 +49,7 @@ unit:
 - floor
 - type: "residential" | "office"
 - owner (FK → user.id)
+- aliquot (numeric, nullable) -- percentage 0-100, null = equal split
 - created_at
 - updated_at
 

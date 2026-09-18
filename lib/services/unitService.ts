@@ -254,3 +254,25 @@ export async function getUnitsByOwnerStatus(
   if (error) throw error;
   return (data ?? []) as Unit[];
 }
+
+export async function updateUnitAliquot(unitId: string, aliquot: number | null): Promise<void> {
+  const { error } = await supabase
+    .from(TABLE)
+    .update({ aliquot, updated_at: new Date().toISOString() })
+    .eq("id", unitId);
+  if (error) throw error;
+}
+
+export async function batchUpdateAliquots(updates: { id: string; aliquot: number | null }[]): Promise<void> {
+  for (const { id, aliquot } of updates) {
+    await updateUnitAliquot(id, aliquot);
+  }
+}
+
+export async function renameUnit(unitId: string, newNum: string): Promise<void> {
+  const { error } = await supabase
+    .from(TABLE)
+    .update({ num: newNum, updated_at: new Date().toISOString() })
+    .eq("id", unitId);
+  if (error) throw error;
+}

@@ -55,6 +55,7 @@ export interface Unit {
   owner: string | null;
   owner_status?: "pending" | "verified";
   claim_blocked_until?: string;
+  aliquot?: number | null;
   created_at: string;
   updated_at: string;
 }

@@ -1,0 +1,15 @@
+{
+  "extracted_at": "2026-09-18T22:20:06.035563+00:00",
+  "condominiums": [],
+  "buildings": [],
+  "units": [],
+  "expenses": [],
+  "expense_entries": [],
+  "summary": {
+    "condominium_count": 0,
+    "building_count": 0,
+    "unit_count": 0,
+    "expense_count": 0,
+    "expense_entry_count": 0
+  }
+}

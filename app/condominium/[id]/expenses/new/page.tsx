@@ -118,12 +118,25 @@ export default function NewExpensePage() {
       return;
     }
 
-    const perUnit = totalAmount / scopeUnits.length;
-    const unitAmounts = scopeUnits.map((u) => ({
-      unit: u.id,
-      amount: Math.round(perUnit * 100) / 100,
-    }));
+    const allHaveAliquot = scopeUnits.every((u) => u.aliquot != null && u.aliquot > 0);
+    let unitAmounts: { unit: string; amount: number }[];
 
+    if (allHaveAliquot && scopeUnits.length > 0) {
+      const totalAliquot = scopeUnits.reduce((sum, u) => sum + (u.aliquot ?? 0), 0);
+      unitAmounts = scopeUnits.map((u) => ({
+        unit: u.id,
+        amount: Math.round((totalAmount * ((u.aliquot ?? 0) / totalAliquot)) * 100) / 100,
+      }));
+    } else {
+      // Equal split fallback
+      const perUnit = totalAmount / scopeUnits.length;
+      unitAmounts = scopeUnits.map((u) => ({
+        unit: u.id,
+        amount: Math.round(perUnit * 100) / 100,
+      }));
+    }
+
+    // Remainder adjustment (existing logic)
     const remainder =
       Math.round(
         (totalAmount - unitAmounts.reduce((s, ua) => s + ua.amount, 0)) * 100

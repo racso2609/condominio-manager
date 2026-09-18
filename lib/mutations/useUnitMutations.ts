@@ -11,6 +11,9 @@ import {
   assignUnitOwner,
   removeUnitOwner,
   deleteUnit,
+  updateUnitAliquot,
+  batchUpdateAliquots,
+  renameUnit,
 } from "@/lib/services/unitService";
 import { queryKeys } from "@/lib/queries/keys";
 
@@ -166,6 +169,42 @@ export function useDeleteUnit() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.units.all(),
       });
+    },
+  });
+}
+
+export function useUpdateUnitAliquot() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ unitId, aliquot }: { unitId: string; aliquot: number | null }) =>
+      updateUnitAliquot(unitId, aliquot),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.units.all() });
+    },
+  });
+}
+
+export function useBatchUpdateAliquots() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (updates: { id: string; aliquot: number | null }[]) =>
+      batchUpdateAliquots(updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.units.all() });
+    },
+  });
+}
+
+export function useRenameUnit() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ unitId, newNum }: { unitId: string; newNum: string }) =>
+      renameUnit(unitId, newNum),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.units.all() });
     },
   });
 }
