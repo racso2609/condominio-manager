@@ -39,6 +39,12 @@ export default function CondominiumDetail() {
     return unitsQueries.flatMap((q) => q.data ?? []);
   }, [unitsQueries]);
 
+  const totalUnits = units.length;
+  const totalAliquot = useMemo(
+    () => units.reduce((sum, u) => sum + (u.aliquot ?? 0), 0),
+    [units]
+  );
+
   const unitIds = useMemo(() => units.map((u) => u.id), [units]);
   const { data: entries = [], isLoading: entriesLoading } =
     useEntriesByUnits(unitIds);
@@ -190,6 +196,27 @@ export default function CondominiumDetail() {
         </div>
       )}
 
+      {totalUnits > 0 && (
+        <div className="grid grid-cols-2 gap-4 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-black">
+          <div>
+            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              Total unidades
+            </p>
+            <p className="mt-1 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+              {totalUnits}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              Total alícuotas
+            </p>
+            <p className="mt-1 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+              {totalAliquot.toFixed(2)}%
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         {isAdminOrManager && (
           <>
@@ -250,29 +277,38 @@ export default function CondominiumDetail() {
         <EmptyState message={isAdminOrManager ? 'Usa el botón "Añadir edificio" para comenzar a registrar los edificios de este condominio.' : "No hay edificios disponibles en este momento."} />
       ) : (
         <section className="grid gap-4 sm:grid-cols-2">
-          {buildings.map((b) => (
-            <Link
-              key={b.id}
-              href={`/condominium/${params.id}/buildings/${b.id}`}
-              className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-black dark:hover:border-zinc-700"
-            >
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 text-sm font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                  {b.symbol}
-                </span>
-                <div>
-                  <h3 className="font-medium text-zinc-900 dark:text-zinc-50">
-                    {b.name}
-                  </h3>
-                  {b.address && (
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                      {b.address}
-                    </p>
-                  )}
+          {buildings.map((b) => {
+            const buildingUnitCount = units.filter(
+              (u) => u.building === b.id
+            ).length;
+            return (
+              <Link
+                key={b.id}
+                href={`/condominium/${params.id}/buildings/${b.id}`}
+                className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-black dark:hover:border-zinc-700"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 text-sm font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                    {b.symbol}
+                  </span>
+                  <div>
+                    <h3 className="font-medium text-zinc-900 dark:text-zinc-50">
+                      {b.name}
+                    </h3>
+                    {b.address && (
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                        {b.address}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </Link>
-          ))}
+                <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                  {buildingUnitCount}{" "}
+                  {buildingUnitCount === 1 ? "unidad" : "unidades"}
+                </p>
+              </Link>
+            );
+          })}
         </section>
       )}
     </div>
