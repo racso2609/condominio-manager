@@ -278,9 +278,12 @@ export default function CondominiumDetail() {
       ) : (
         <section className="grid gap-4 sm:grid-cols-2">
           {buildings.map((b) => {
-            const buildingUnitCount = units.filter(
-              (u) => u.building === b.id
-            ).length;
+            const buildingUnits = units.filter((u) => u.building === b.id);
+            const buildingUnitCount = buildingUnits.length;
+            const buildingAliquot = buildingUnits.reduce(
+              (sum, u) => sum + (u.aliquot ?? 0),
+              0
+            );
             return (
               <Link
                 key={b.id}
@@ -304,7 +307,8 @@ export default function CondominiumDetail() {
                 </div>
                 <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
                   {buildingUnitCount}{" "}
-                  {buildingUnitCount === 1 ? "unidad" : "unidades"}
+                  {buildingUnitCount === 1 ? "unidad" : "unidades"} ·{" "}
+                  {buildingAliquot.toFixed(2)}%
                 </p>
               </Link>
             );
