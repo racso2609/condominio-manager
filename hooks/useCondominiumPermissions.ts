@@ -6,6 +6,8 @@ import {
   useManagedBuildingIds,
 } from "@/lib/queries/useCondominium";
 
+const EMPTY_IDS: string[] = [];
+
 export function useCondominiumPermissions(condominiumId?: string) {
   const { appUser } = useAuthContext();
 
@@ -13,8 +15,9 @@ export function useCondominiumPermissions(condominiumId?: string) {
     appUser?.id,
     condominiumId
   );
-  const { data: managedBuildingIds = [], isLoading: managedLoading } =
+  const { data: managedBuildingIdsData, isLoading: managedLoading } =
     useManagedBuildingIds(appUser?.id, condominiumId);
+  const managedBuildingIds = managedBuildingIdsData ?? EMPTY_IDS;
 
   const isGlobalAdmin =
     appUser?.role === "admin" || appUser?.role === "administrator";

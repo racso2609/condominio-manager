@@ -4,7 +4,10 @@ import { useMemo, useState } from "react";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { PageHeader } from "@/components/PageHeader";
 import { useCondominiumPage } from "@/hooks/useCondominiumPage";
-import { useCondominiumRoles } from "@/lib/queries/useCondominium";
+import {
+  useCondominiumRoles,
+  useBuildingManagers,
+} from "@/lib/queries/useCondominium";
 import { useBuildingsByCondominium } from "@/lib/queries/useBuilding";
 import { useUnitsByBuildings } from "@/lib/queries/useUnit";
 import { useUsers } from "@/lib/queries/useUser";
@@ -24,6 +27,8 @@ import {
 import {
   useVerifyRole,
   useDeleteCondominiumRole,
+  useAddBuildingManagerAssignment,
+  useRemoveBuildingManagerAssignment,
 } from "@/lib/mutations/useCondominiumMutations";
 import { useMarkEntryAsPaid } from "@/lib/mutations/useExpenseEntryMutations";
 import {
@@ -47,6 +52,9 @@ import {
   buildWhatsAppLink,
 } from "@/lib/utils/whatsapp";
 
+const EMPTY_BUILDINGS: Building[] = [];
+const EMPTY_MANAGERS: { role: CondominiumRole; buildings: string[] }[] = [];
+
 export default function ResidentsPage() {
   const {
     appUser,
@@ -59,20 +67,20 @@ export default function ResidentsPage() {
   } = useCondominiumPage();
   const { data: roles = [], isLoading: rolesLoading } =
     useCondominiumRoles(condominiumId);
-  const { data: allBuildings = [], isLoading: buildingsLoading } =
+  const { data: allBuildingsData, isLoading: buildingsLoading } =
     useBuildingsByCondominium(condominiumId);
+  const allBuildings = allBuildingsData ?? EMPTY_BUILDINGS;
   const { data: paymentMethods = [], isLoading: methodsLoading } =
     usePaymentMethodsByCondominium(condominiumId);
+  const { data: buildingManagersData, isLoading: managersLoading } =
+    useBuildingManagers(condominiumId);
+  const buildingManagers = buildingManagersData ?? EMPTY_MANAGERS;
 
-  const buildings = useMemo(
-    () =>
-      isCondoAdmin
-        ? allBuildings
-        : allBuildings.filter((b) => managedBuildingIds.includes(b.id)),
-    [allBuildings, isCondoAdmin, managedBuildingIds]
-  );
+  const buildings = isCondoAdmin
+    ? allBuildings
+    : allBuildings.filter((b) => managedBuildingIds.includes(b.id));
 
-  const buildingIds = useMemo(() => buildings.map((b) => b.id), [buildings]);
+  const buildingIds = buildings.map((b) => b.id);
   const unitsQueries = useUnitsByBuildings(buildingIds);
 
   const allUnits = useMemo(() => {
@@ -103,8 +111,11 @@ export default function ResidentsPage() {
     roles.forEach((r) => {
       if (r.role === "resident" && r.user) ids.add(r.user);
     });
+    buildingManagers.forEach((m) => {
+      if (m.role.user) ids.add(m.role.user);
+    });
     return Array.from(ids);
-  }, [allUnits, roles]);
+  }, [allUnits, roles, buildingManagers]);
 
   const ownersQueries = useUsers(ownerIds);
 
@@ -167,6 +178,13 @@ export default function ResidentsPage() {
   const { mutate: deleteCondominiumRole } = useDeleteCondominiumRole();
   const { mutate: markEntryAsPaid, isPending: validatingPayment } =
     useMarkEntryAsPaid();
+  const { mutate: addManagerAssignment } = useAddBuildingManagerAssignment();
+  const { mutate: removeManagerAssignment } =
+    useRemoveBuildingManagerAssignment();
+  const [addingTowerForRole, setAddingTowerForRole] = useState<string | null>(
+    null
+  );
+  const [newTowerId, setNewTowerId] = useState("");
 
   const handleReject = (unitId: string) => {
     if (
@@ -243,6 +261,34 @@ export default function ResidentsPage() {
     });
   };
 
+  const handleAddTower = (roleId: string) => {
+    if (!newTowerId) return;
+    addManagerAssignment(
+      { roleId, building: newTowerId, condominiumId },
+      {
+        onSuccess: () => {
+          setAddingTowerForRole(null);
+          setNewTowerId("");
+        },
+        onError: () => alert("Error al asignar la torre"),
+      }
+    );
+  };
+
+  const handleRemoveTower = (roleId: string, buildingId: string) => {
+    const building = buildingsMap[buildingId];
+    if (
+      !window.confirm(
+        `¿Quitar ${building?.name ?? "esta torre"} de este encargado?`
+      )
+    )
+      return;
+    removeManagerAssignment(
+      { roleId, building: buildingId, condominiumId },
+      { onError: () => alert("Error al quitar la torre") }
+    );
+  };
+
   const getPendingEntriesForOwner = (ownerId: string): ExpenseEntry[] => {
     const units = unitsByOwner[ownerId] ?? [];
     const entries: ExpenseEntry[] = [];
@@ -291,19 +337,17 @@ export default function ResidentsPage() {
       }, {})
   );
 
-  const buildingsMap = useMemo(() => {
-    const map: Record<string, Building> = {};
-    buildings.forEach((b) => {
-      map[b.id] = b;
-    });
-    return map;
-  }, [buildings]);
+  const buildingsMap: Record<string, Building> = {};
+  buildings.forEach((b) => {
+    buildingsMap[b.id] = b;
+  });
 
   const loading =
     condominiumLoading ||
     rolesLoading ||
     buildingsLoading ||
     methodsLoading ||
+    managersLoading ||
     condoExpensesLoading ||
     unitsQueries.some((q) => q.isLoading) ||
     ownersQueries.some((q) => q.isLoading) ||
@@ -708,6 +752,135 @@ export default function ResidentsPage() {
           })}
         </div>
       </section>
+
+      {isCondoAdmin && (
+        <section>
+          <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+            Encargados de torre ({buildingManagers.length})
+          </h2>
+          {buildingManagers.length === 0 ? (
+            <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-black">
+              <p className="text-zinc-500 dark:text-zinc-400">
+                No hay encargados de torre. Invita uno desde la página de
+                invitaciones.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {buildingManagers.map(({ role: managerRole, buildings: mgrBwd }) => {
+                const managerUser = owners[managerRole.user];
+                const name =
+                  managerUser?.name ??
+                  managerRole.invited_email ??
+                  "Encargado sin nombre";
+                const availableBuildings = allBuildings.filter(
+                  (b) => !mgrBwd.includes(b.id)
+                );
+                return (
+                  <div
+                    key={managerRole.id}
+                    className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-black"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                          {name}
+                        </p>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                          {managerUser?.email ?? managerRole.invited_email ?? ""}
+                        </p>
+                      </div>
+                      <Badge
+                        color={
+                          managerRole.status === "verified" ? "emerald" : "amber"
+                        }
+                        uppercase
+                      >
+                        {managerRole.status === "verified"
+                          ? "Verificado"
+                          : "Pendiente"}
+                      </Badge>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {mgrBwd.map((buildingId) => {
+                        const building = buildingsMap[buildingId];
+                        return (
+                          <span
+                            key={buildingId}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
+                          >
+                            {building?.name ?? "Torre"}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleRemoveTower(managerRole.id, buildingId)
+                              }
+                              className="text-zinc-400 hover:text-red-600"
+                              aria-label={`Quitar ${building?.name ?? "torre"}`}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        );
+                      })}
+
+                      {availableBuildings.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          {addingTowerForRole === managerRole.id ? (
+                            <>
+                              <Select
+                                value={newTowerId}
+                                onChange={(e) => setNewTowerId(e.target.value)}
+                              >
+                                <option value="">Selecciona torre</option>
+                                {availableBuildings.map((b) => (
+                                  <option key={b.id} value={b.id}>
+                                    {b.name}
+                                  </option>
+                                ))}
+                              </Select>
+                              <Button
+                                size="xs"
+                                variant="primary"
+                                onClick={() => handleAddTower(managerRole.id)}
+                                disabled={!newTowerId}
+                              >
+                                Agregar
+                              </Button>
+                              <Button
+                                size="xs"
+                                variant="secondary"
+                                onClick={() => {
+                                  setAddingTowerForRole(null);
+                                  setNewTowerId("");
+                                }}
+                              >
+                                Cancelar
+                              </Button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAddingTowerForRole(managerRole.id);
+                                setNewTowerId("");
+                              }}
+                              className="rounded-full border border-dashed border-zinc-300 px-3 py-1 text-xs font-medium text-zinc-500 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                            >
+                              + Añadir torre
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       {editingResident && (
         <EditResidentContactModal
