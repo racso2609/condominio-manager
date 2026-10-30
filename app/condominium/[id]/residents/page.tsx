@@ -39,6 +39,7 @@ import {
   Building,
   ExpenseEntry,
   AppUser,
+  rankCondominiumRole,
 } from "@/lib/types";
 import { PaymentMethodCard } from "@/components/PaymentMethodCard";
 import { Badge } from "@/components/Badge";
@@ -361,27 +362,12 @@ export default function ResidentsPage() {
   const residentRoles = Object.values(
     roles
       .filter((r) => {
-        if (r.role === "administrator") {
-          return unitsByOwner[r.user]?.length > 0;
-        }
-        if (!isCondoAdmin) {
-          return (unitsByOwner[r.user]?.length ?? 0) > 0;
-        }
-        return true;
+        if (isCondoAdmin) return true;
+        return (unitsByOwner[r.user]?.length ?? 0) > 0;
       })
       .reduce<Record<string, CondominiumRole>>((acc, r) => {
         const existing = acc[r.user];
-        if (!existing) {
-          acc[r.user] = r;
-          return acc;
-        }
-        const existingScore =
-          (existing.status === "verified" ? 2 : 0) +
-          (existing.role === "administrator" ? 1 : 0);
-        const newScore =
-          (r.status === "verified" ? 2 : 0) +
-          (r.role === "administrator" ? 1 : 0);
-        if (newScore > existingScore) {
+        if (!existing || rankCondominiumRole(r) > rankCondominiumRole(existing)) {
           acc[r.user] = r;
         }
         return acc;
@@ -598,7 +584,6 @@ export default function ResidentsPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       {isCondoAdmin &&
                         r.role === "resident" &&
-                        r.status === "verified" &&
                         !!r.user && (
                           <Button
                             type="button"

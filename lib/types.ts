@@ -44,6 +44,35 @@ export interface BuildingManagerAssignment {
   created_at: string;
 }
 
+export type CondominiumAccessRole =
+  | "super_admin"
+  | "condo_admin"
+  | "building_manager"
+  | "resident"
+  | "pending"
+  | "none";
+
+export interface CondominiumMembership {
+  role: CondominiumAccessRole;
+  userRole: CondominiumRole | null;
+  managedBuildingIds: string[];
+}
+
+export function rankCondominiumRole(role: CondominiumRole): number {
+  const statusScore = role.status === "verified" ? 2 : 0;
+  const roleScore = role.role === "administrator" ? 1 : 0;
+  return statusScore + roleScore;
+}
+
+export function pickPrimaryRole(
+  roles: CondominiumRole[]
+): CondominiumRole | null {
+  if (roles.length === 0) return null;
+  return roles.reduce((best, current) =>
+    rankCondominiumRole(current) > rankCondominiumRole(best) ? current : best
+  );
+}
+
 export interface Building {
   id: string;
   condominium: string;

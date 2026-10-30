@@ -441,3 +441,43 @@ A managed owner keeps their units/payments/debt (the role change is additive to 
 
 - Each verified resident row (condo admin only): **"🛡️ Hacer encargado"** → multi-select towers → `promoteToBuildingManager`.
 - "Encargados de torre" section: **"Quitar rol"** → `demoteToResident` (confirm), plus the existing add/remove tower chips.
+
+---
+
+## 12. Follow-up — normalized role resolution (single source of truth)
+
+### 12.1 Problem
+
+Role resolution was scattered and inconsistent:
+
+- `getUserCondominiumRole` used `.single()`, which throws (→ `null`) when a user has more than one `condominium_roles` row in the same condominium (e.g. invited as resident, later as administrator), silently dropping all permissions.
+- Pages derived permissions ad hoc: `app/condominium/[id]/page.tsx` used `useUserCondominiumRole` directly; complaints pages used `userRole.role === "administrator"` (ignoring building scope); each page mixed the global `users.role` with the per-condominium role without a shared rule.
+- The residents list dropped administrators without units and hid members when the caller was not a condo admin, so a condo admin could end up seeing only themselves.
+
+### 12.2 Resolution model
+
+New canonical resolver in `lib/services/condominiumService.ts`:
+
+- `getUserCondominiumRole(userId, condominiumId)` → fetches **all** rows and returns the highest-ranked one via `pickPrimaryRole` (ranking lives in `lib/types.ts`: verified ≥ pending, administrator > resident). No `.single()`.
+- `getCondominiumMembership(userId, condominiumId, globalRole)` → returns `{ role, userRole, managedBuildingIds }` with one access role:
+
+| Precedence | Condition | `role` |
+|---|---|---|
+| 1 | `users.role ∈ {admin, administrator}` | `super_admin` |
+| 2 | verified `administrator` + 0 assignments | `condo_admin` |
+| 3 | verified `administrator` + ≥1 assignment | `building_manager` |
+| 4 | verified `resident` | `resident` |
+| 5 | `pending` | `pending` |
+| 6 | no row | `none` |
+
+A `super_admin` is **always** full condominium admin; assignments never degrade a global admin.
+
+### 12.3 Hook contract
+
+`useCondominiumPermissions(condominiumId)` is the **only** permission source. It consumes `useCondominiumMembership` and returns `{ role, userRole, isSuperAdmin, isCondoAdmin, isBuildingManager, isResident, isPending, isAdminOrManager, managedBuildingIds, canManageBuilding, canManageCondoLevel }`. `useCondominiumPage` re-exposes all of them.
+
+All pages migrated: `[id]/page.tsx`, `residents`, `complaints`, `complaints/new`, plus the existing building/expense/payment-method pages. `useUserCondominiumRole` and `useManagedBuildingIds` remain for compatibility but are no longer used by pages.
+
+### 12.4 Residents list
+
+With `isCondoAdmin`, the list shows **every** member (all `condominium_roles` rows, one per user by highest rank), not only unit owners. Managers/residents only see unit owners. A promotable target is any `resident` row (any status, including pending) that has a linked `user`; already-administrator rows show no promote button.

@@ -6,7 +6,8 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
-import { useCondominium, useUserCondominiumRole } from "@/lib/queries/useCondominium";
+import { useCondominium } from "@/lib/queries/useCondominium";
+import { useCondominiumPermissions } from "@/hooks/useCondominiumPermissions";
 import { useCreateComplaint } from "@/lib/mutations/useComplaintMutations";
 import { FormSkeleton } from "@/components/skeleton";
 import { PermissionDenied } from "@/components/PermissionDenied";
@@ -21,10 +22,11 @@ export default function NewComplaintPage() {
 
   const { data: condominium, isLoading: condominiumLoading } =
     useCondominium(condominiumId);
-  const { data: userRole, isLoading: roleLoading } = useUserCondominiumRole(
-    appUser?.id,
-    condominiumId
-  );
+  const {
+    userRole,
+    role,
+    isLoading: roleLoading,
+  } = useCondominiumPermissions(condominiumId);
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -32,9 +34,7 @@ export default function NewComplaintPage() {
 
   const { mutate: createComplaint, isPending: saving } = useCreateComplaint();
 
-  const isGlobalAdmin = appUser?.role === "admin";
-  const canCreate =
-    isGlobalAdmin || (userRole?.role === "resident" && !!userRole?.user);
+  const canCreate = role !== "none" && !!userRole?.user;
 
   useEffect(() => {
     if (condominiumLoading || roleLoading) return;
@@ -42,17 +42,10 @@ export default function NewComplaintPage() {
       router.replace("/home");
       return;
     }
-    if (!isGlobalAdmin && !userRole) {
+    if (role === "none") {
       router.replace("/home");
     }
-  }, [
-    condominiumLoading,
-    roleLoading,
-    condominium,
-    userRole,
-    isGlobalAdmin,
-    router,
-  ]);
+  }, [condominiumLoading, roleLoading, condominium, role, router]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     handleFileInput(e, files, setFiles);

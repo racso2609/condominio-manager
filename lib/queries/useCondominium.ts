@@ -14,8 +14,9 @@ import {
   getUserCondominiumRole,
   getManagedBuildingIds,
   getBuildingManagers,
+  getCondominiumMembership,
 } from "@/lib/services/condominiumService";
-import { Condominium } from "@/lib/types";
+import { Condominium, CondominiumMembership } from "@/lib/types";
 import { queryKeys } from "./keys";
 
 export function useUserCondominiums(userId?: string, role?: string) {
@@ -61,6 +62,30 @@ export function useUserCondominiumRole(
         ? () => getUserCondominiumRole(userId, condominiumId)
         : skipToken,
     enabled: Boolean(userId && condominiumId),
+  });
+}
+
+export function useCondominiumMembership(
+  userId: string | undefined,
+  condominiumId: string | undefined,
+  globalRole: string | undefined
+) {
+  return useQuery({
+    queryKey: queryKeys.condominiums.membership(
+      condominiumId ?? "",
+      userId ?? "",
+      globalRole ?? ""
+    ),
+    queryFn:
+      userId && condominiumId && globalRole
+        ? () => getCondominiumMembership(userId, condominiumId, globalRole)
+        : skipToken,
+    enabled: Boolean(userId && condominiumId),
+    placeholderData: (): CondominiumMembership => ({
+      role: "none",
+      userRole: null,
+      managedBuildingIds: [],
+    }),
   });
 }
 

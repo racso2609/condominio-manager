@@ -1,38 +1,26 @@
 "use client";
 
 import { useAuthContext } from "@/context/authContext";
-import {
-  useUserCondominiumRole,
-  useManagedBuildingIds,
-} from "@/lib/queries/useCondominium";
-
-const EMPTY_IDS: string[] = [];
+import { useCondominiumMembership } from "@/lib/queries/useCondominium";
 
 export function useCondominiumPermissions(condominiumId?: string) {
   const { appUser } = useAuthContext();
 
-  const { data: userRole, isLoading: roleLoading } = useUserCondominiumRole(
+  const { data: membership, isLoading } = useCondominiumMembership(
     appUser?.id,
-    condominiumId
+    condominiumId,
+    appUser?.role
   );
-  const { data: managedBuildingIdsData, isLoading: managedLoading } =
-    useManagedBuildingIds(appUser?.id, condominiumId);
-  const managedBuildingIds = managedBuildingIdsData ?? EMPTY_IDS;
 
-  const isGlobalAdmin =
-    appUser?.role === "admin" || appUser?.role === "administrator";
+  const role = membership?.role ?? "none";
+  const userRole = membership?.userRole ?? null;
+  const managedBuildingIds = membership?.managedBuildingIds ?? [];
 
-  const isVerifiedCondoAdmin =
-    userRole?.role === "administrator" &&
-    userRole?.status === "verified" &&
-    managedBuildingIds.length === 0;
-
-  const isCondoAdmin = isGlobalAdmin || isVerifiedCondoAdmin;
-
-  const isBuildingManager =
-    userRole?.role === "administrator" &&
-    userRole?.status === "verified" &&
-    managedBuildingIds.length > 0;
+  const isSuperAdmin = role === "super_admin";
+  const isCondoAdmin = role === "super_admin" || role === "condo_admin";
+  const isBuildingManager = role === "building_manager";
+  const isResident = role === "resident";
+  const isPending = role === "pending";
 
   const isAdminOrManager = isCondoAdmin || isBuildingManager;
 
@@ -41,13 +29,17 @@ export function useCondominiumPermissions(condominiumId?: string) {
 
   return {
     appUser,
+    role,
     userRole,
+    isSuperAdmin,
     isCondoAdmin,
     isBuildingManager,
+    isResident,
+    isPending,
     isAdminOrManager,
     managedBuildingIds,
     canManageBuilding,
     canManageCondoLevel: isCondoAdmin,
-    isLoading: roleLoading || managedLoading,
+    isLoading,
   };
 }

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Button } from "@/components/Button";
 import { useCondominiumPage } from "@/hooks/useCondominiumPage";
-import { useUserCondominiumRole } from "@/lib/queries/useCondominium";
 import { useBuildingsByCondominium } from "@/lib/queries/useBuilding";
 import { useUnitsByBuildings } from "@/lib/queries/useUnit";
 import { useEntriesByUnits } from "@/lib/queries/useExpenseEntry";
@@ -26,6 +25,7 @@ export default function CondominiumDetail() {
     isAdminOrManager,
     isCondoAdmin,
     isBuildingManager,
+    isPending,
     managedBuildingIds,
   } = useCondominiumPage();
   const { data: allBuildings = [], isLoading: buildingsLoading } =
@@ -37,10 +37,6 @@ export default function CondominiumDetail() {
         ? allBuildings
         : allBuildings.filter((b) => managedBuildingIds.includes(b.id)),
     [allBuildings, isCondoAdmin, managedBuildingIds]
-  );
-  const { data: userRole, isLoading: roleLoading } = useUserCondominiumRole(
-    appUser?.id,
-    condominiumId
   );
 
   const buildingIds = useMemo(() => buildings.map((b) => b.id), [buildings]);
@@ -96,7 +92,6 @@ export default function CondominiumDetail() {
   const loading =
     condominiumLoading ||
     buildingsLoading ||
-    roleLoading ||
     entriesLoading ||
     unitsQueries.some((q) => q.isLoading);
 
@@ -182,7 +177,7 @@ export default function CondominiumDetail() {
         )}
       </div>
 
-      {userRole?.role === "resident" && userRole?.status === "pending" && (
+      {isPending && (
         <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-900/50 dark:bg-amber-900/20">
           <h2 className="text-sm font-semibold text-amber-800 dark:text-amber-300">
             Reclama tu unidad o apartamento

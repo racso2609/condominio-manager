@@ -3,6 +3,8 @@ import {
   Condominium,
   CondominiumRole,
   BuildingManagerAssignment,
+  CondominiumMembership,
+  pickPrimaryRole,
 } from "@/lib/types";
 
 const CONDO_TABLE = "condominiums";
@@ -102,6 +104,9 @@ export async function getCondominiumRoles(condominiumId: string): Promise<Condom
   return (data ?? []) as CondominiumRole[];
 }
 
+// Single source of truth for a user's role in a condominium. Handles duplicate
+// role rows by ranking (verified + administrator wins) so callers never break
+// on `.single()`.
 export async function getUserCondominiumRole(
   userId: string | undefined,
   condominiumId: string
@@ -111,36 +116,74 @@ export async function getUserCondominiumRole(
     .from(ROLE_TABLE)
     .select("*")
     .eq("condominium", condominiumId)
-    .eq("user", userId)
-    .single();
+    .eq("user", userId);
 
-  if (error || !data) return null;
-  return data as CondominiumRole;
+  if (error) throw error;
+  return pickPrimaryRole((data ?? []) as CondominiumRole[]);
+}
+
+async function getAssignmentBuildingIds(roleId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from(ASSIGNMENT_TABLE)
+    .select("building")
+    .eq("role", roleId);
+
+  if (error) throw error;
+  return (data ?? []).map((a) => a.building as string);
 }
 
 export async function getManagedBuildingIds(
   userId: string,
   condominiumId: string
 ): Promise<string[]> {
-  const { data: role, error: roleError } = await supabase
-    .from(ROLE_TABLE)
-    .select("id, role, status")
-    .eq("condominium", condominiumId)
-    .eq("user", userId)
-    .maybeSingle();
-
-  if (roleError) throw roleError;
+  const role = await getUserCondominiumRole(userId, condominiumId);
   if (!role || role.role !== "administrator" || role.status !== "verified") {
     return [];
   }
+  return getAssignmentBuildingIds(role.id);
+}
 
-  const { data: assignments, error: assignError } = await supabase
-    .from(ASSIGNMENT_TABLE)
-    .select("building")
-    .eq("role", role.id);
+// Resolves the full membership (access role + scope) in one call.
+export async function getCondominiumMembership(
+  userId: string | undefined,
+  condominiumId: string,
+  globalRole?: string
+): Promise<CondominiumMembership> {
+  if (!userId) {
+    return { role: "none", userRole: null, managedBuildingIds: [] };
+  }
 
-  if (assignError) throw assignError;
-  return (assignments ?? []).map((a) => a.building as string);
+  const userRole = await getUserCondominiumRole(userId, condominiumId);
+  const isAdminRole =
+    userRole?.role === "administrator" && userRole?.status === "verified";
+  const managedBuildingIds =
+    isAdminRole || globalRole === "admin" || globalRole === "administrator"
+      ? userRole
+        ? await getAssignmentBuildingIds(userRole.id)
+        : []
+      : [];
+
+  if (globalRole === "admin" || globalRole === "administrator") {
+    return { role: "super_admin", userRole, managedBuildingIds };
+  }
+
+  if (!userRole) {
+    return { role: "none", userRole: null, managedBuildingIds: [] };
+  }
+
+  if (userRole.status === "pending") {
+    return { role: "pending", userRole, managedBuildingIds: [] };
+  }
+
+  if (userRole.role === "administrator") {
+    return {
+      role: managedBuildingIds.length > 0 ? "building_manager" : "condo_admin",
+      userRole,
+      managedBuildingIds,
+    };
+  }
+
+  return { role: "resident", userRole, managedBuildingIds: [] };
 }
 
 export async function getBuildingManagers(

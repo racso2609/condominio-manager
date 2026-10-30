@@ -6,7 +6,8 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { PageHeader } from "@/components/PageHeader";
 import { useAuthContext } from "@/context/authContext";
 import { Button } from "@/components/Button";
-import { useCondominium, useUserCondominiumRole } from "@/lib/queries/useCondominium";
+import { useCondominium } from "@/lib/queries/useCondominium";
+import { useCondominiumPermissions } from "@/hooks/useCondominiumPermissions";
 import { useComplaintsByCondominium } from "@/lib/queries/useComplaint";
 import { useBuildingsByCondominium } from "@/lib/queries/useBuilding";
 import { useUnitsByOwners } from "@/lib/queries/useUnit";
@@ -61,10 +62,12 @@ export default function ComplaintsPage() {
 
   const { data: condominium, isLoading: condominiumLoading } =
     useCondominium(condominiumId);
-  const { data: userRole, isLoading: roleLoading } = useUserCondominiumRole(
-    appUser?.id,
-    condominiumId
-  );
+  const {
+    userRole,
+    isCondoAdmin,
+    role,
+    isLoading: roleLoading,
+  } = useCondominiumPermissions(condominiumId);
   const { data: complaints = [], isLoading: complaintsLoading } =
     useComplaintsByCondominium(condominiumId);
   const { data: buildings = [], isLoading: buildingsLoading } =
@@ -117,11 +120,8 @@ export default function ComplaintsPage() {
   const { mutate: deleteComplaint, isPending: isDeleting } =
     useDeleteComplaint();
 
-  const isGlobalAdmin = appUser?.role === "admin";
-  const isCondoAdmin = userRole?.role === "administrator";
-  const canManage = isGlobalAdmin || isCondoAdmin;
-  const canCreate =
-    isGlobalAdmin || (userRole?.role === "resident" && !!userRole?.user);
+  const canManage = isCondoAdmin;
+  const canCreate = role !== "none" && !!userRole?.user;
 
   useEffect(() => {
     if (condominiumLoading || roleLoading) return;
@@ -129,17 +129,10 @@ export default function ComplaintsPage() {
       router.replace("/home");
       return;
     }
-    if (!isGlobalAdmin && !userRole) {
+    if (role === "none") {
       router.replace("/home");
     }
-  }, [
-    condominiumLoading,
-    roleLoading,
-    condominium,
-    userRole,
-    isGlobalAdmin,
-    router,
-  ]);
+  }, [condominiumLoading, roleLoading, condominium, role, router]);
 
   const handleStatusChange = (
     complaint: Complaint,
