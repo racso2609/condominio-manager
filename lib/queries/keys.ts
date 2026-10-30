@@ -10,6 +10,15 @@ export const queryKeys = {
       ["condominiums", condominiumId, "roles", "user", userId] as const,
     pendingRoles: (condominiumId: string) =>
       ["condominiums", condominiumId, "roles", "pending"] as const,
+    managedBuildings: (condominiumId: string, userId: string) =>
+      [
+        "condominiums",
+        condominiumId,
+        "managedBuildings",
+        userId,
+      ] as const,
+    buildingManagers: (condominiumId: string) =>
+      ["condominiums", condominiumId, "buildingManagers"] as const,
     pendingInvites: (email: string) =>
       ["condominiums", "invites", email] as const,
     inviteByToken: (token: string) =>

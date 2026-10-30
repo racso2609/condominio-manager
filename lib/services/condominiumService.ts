@@ -1,8 +1,14 @@
 import { supabase } from "@/lib/supabase";
-import { Condominium, CondominiumRole } from "@/lib/types";
+import {
+  Condominium,
+  CondominiumRole,
+  BuildingManagerAssignment,
+} from "@/lib/types";
 
 const CONDO_TABLE = "condominiums";
 const ROLE_TABLE = "condominium_roles";
+const BUILDING_TABLE = "buildings";
+const ASSIGNMENT_TABLE = "building_manager_assignments";
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -112,11 +118,113 @@ export async function getUserCondominiumRole(
   return data as CondominiumRole;
 }
 
+export async function getManagedBuildingIds(
+  userId: string,
+  condominiumId: string
+): Promise<string[]> {
+  const { data: role, error: roleError } = await supabase
+    .from(ROLE_TABLE)
+    .select("id, role, status")
+    .eq("condominium", condominiumId)
+    .eq("user", userId)
+    .maybeSingle();
+
+  if (roleError) throw roleError;
+  if (!role || role.role !== "administrator" || role.status !== "verified") {
+    return [];
+  }
+
+  const { data: assignments, error: assignError } = await supabase
+    .from(ASSIGNMENT_TABLE)
+    .select("building")
+    .eq("role", role.id);
+
+  if (assignError) throw assignError;
+  return (assignments ?? []).map((a) => a.building as string);
+}
+
+export async function getBuildingManagers(
+  condominiumId: string
+): Promise<{ role: CondominiumRole; buildings: string[] }[]> {
+  const { data: roles, error: rolesError } = await supabase
+    .from(ROLE_TABLE)
+    .select("*")
+    .eq("condominium", condominiumId)
+    .eq("role", "administrator");
+
+  if (rolesError) throw rolesError;
+  if (!roles || roles.length === 0) return [];
+
+  const roleIds = roles.map((r) => r.id);
+  const { data: assignments, error: assignError } = await supabase
+    .from(ASSIGNMENT_TABLE)
+    .select("*")
+    .in("role", roleIds);
+
+  if (assignError) throw assignError;
+
+  const byRole = new Map<string, string[]>();
+  (assignments ?? []).forEach((a: BuildingManagerAssignment) => {
+    const list = byRole.get(a.role) ?? [];
+    list.push(a.building);
+    byRole.set(a.role, list);
+  });
+
+  return roles
+    .map((r) => ({
+      role: r as CondominiumRole,
+      buildings: byRole.get(r.id) ?? [],
+    }))
+    .filter((m) => m.buildings.length > 0);
+}
+
+export async function addBuildingManagerAssignment(
+  roleId: string,
+  building: string
+): Promise<void> {
+  const { error } = await supabase.from(ASSIGNMENT_TABLE).insert({
+    id: generateId(),
+    role: roleId,
+    building,
+    created_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+}
+
+export async function removeBuildingManagerAssignment(
+  roleId: string,
+  building: string
+): Promise<void> {
+  const { error } = await supabase
+    .from(ASSIGNMENT_TABLE)
+    .delete()
+    .eq("role", roleId)
+    .eq("building", building);
+  if (error) throw error;
+}
+
 export async function createInvite(
   condominiumId: string,
   invitedBy: string,
-  email: string
+  email: string,
+  opts?: { role?: "administrator" | "resident"; buildings?: string[] }
 ): Promise<CondominiumRole> {
+  const role = opts?.role ?? "resident";
+  const buildings = opts?.buildings ?? [];
+
+  if (role === "administrator" && buildings.length > 0) {
+    const { data: validBuildings, error: buildingsError } = await supabase
+      .from(BUILDING_TABLE)
+      .select("id")
+      .eq("condominium", condominiumId)
+      .in("id", buildings);
+
+    if (buildingsError) throw buildingsError;
+    if ((validBuildings ?? []).length !== buildings.length) {
+      throw new Error("Una de las torres no pertenece a este condominio");
+    }
+  }
+
   const { data: existing, error: existingError } = await supabase
     .from(ROLE_TABLE)
     .select("*")
@@ -133,11 +241,12 @@ export async function createInvite(
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);
 
+  const roleId = generateId();
   const roleData = {
-    id: generateId(),
+    id: roleId,
     condominium: condominiumId,
     user: null as string | null,
-    role: "resident" as const,
+    role,
     status: "pending" as const,
     invited_email: email,
     invited_by: invitedBy,
@@ -149,6 +258,19 @@ export async function createInvite(
 
   const { error } = await supabase.from(ROLE_TABLE).insert(roleData);
   if (error) throw error;
+
+  if (role === "administrator" && buildings.length > 0) {
+    const assignments = buildings.map((building) => ({
+      id: generateId(),
+      role: roleId,
+      building,
+      created_at: now,
+    }));
+    const { error: assignError } = await supabase
+      .from(ASSIGNMENT_TABLE)
+      .insert(assignments);
+    if (assignError) throw assignError;
+  }
 
   return roleData as unknown as CondominiumRole;
 }

@@ -4,8 +4,8 @@ import { FormEvent, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Breadcrumb } from "@/components/Breadcrumb";
-import { useAuthContext } from "@/context/authContext";
 import { useBuilding } from "@/lib/queries/useBuilding";
+import { useCondominiumPermissions } from "@/hooks/useCondominiumPermissions";
 import { useDuplicateBuilding } from "@/lib/mutations/useBuildingMutations";
 import { Building } from "@/lib/types";
 import { FormSkeleton } from "@/components/skeleton";
@@ -133,7 +133,6 @@ function DuplicateBuildingForm({
 }
 
 export default function DuplicateBuilding() {
-  const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
   const buildingId = params.buildingId as string;
@@ -141,8 +140,7 @@ export default function DuplicateBuilding() {
 
   const { data: building, isLoading } = useBuilding(buildingId);
 
-  const canEdit =
-    appUser?.role === "admin" || appUser?.role === "administrator";
+  const { isCondoAdmin: canEdit } = useCondominiumPermissions(condominiumId);
 
   if (!canEdit) {
     return (

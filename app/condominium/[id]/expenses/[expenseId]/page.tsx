@@ -8,6 +8,7 @@ import { Button } from "@/components/Button";
 import { Badge } from "@/components/Badge";
 import { useAuthContext } from "@/context/authContext";
 import { useCondominium } from "@/lib/queries/useCondominium";
+import { useCondominiumPermissions } from "@/hooks/useCondominiumPermissions";
 import { useExpense } from "@/lib/queries/useExpense";
 import { useEntriesByExpense } from "@/lib/queries/useExpenseEntry";
 import { useUnits } from "@/lib/queries/useUnit";
@@ -89,8 +90,12 @@ export default function ExpenseDetailPage() {
 
   const { mutate: markAsPaid, isPending: isValidating } = useMarkEntryAsPaid();
 
-  const isAdminOrManager =
-    appUser?.role === "admin" || appUser?.role === "administrator";
+  const { isCondoAdmin, isAdminOrManager, canManageBuilding } =
+    useCondominiumPermissions(condominiumId);
+
+  const canManageExpense =
+    isCondoAdmin ||
+    (!!expense?.building && canManageBuilding(expense.building));
 
   useEffect(() => {
     if (
@@ -139,7 +144,7 @@ export default function ExpenseDetailPage() {
     );
   }
 
-  if (!isAdminOrManager) {
+  if (!isAdminOrManager || !canManageExpense) {
     return (
       <PermissionDenied message="No tienes permisos para ver esta página." />
     );

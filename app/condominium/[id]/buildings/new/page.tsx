@@ -4,14 +4,14 @@ import { FormEvent, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Breadcrumb } from "@/components/Breadcrumb";
-import { useAuthContext } from "@/context/authContext";
+import { useCondominiumPermissions } from "@/hooks/useCondominiumPermissions";
 import { useCreateBuilding } from "@/lib/mutations/useBuildingMutations";
 import { PermissionDenied } from "@/components/PermissionDenied";
 
 export default function NewBuilding() {
-  const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
+  const condominiumId = params.id as string;
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [address, setAddress] = useState("");
@@ -19,7 +19,7 @@ export default function NewBuilding() {
 
   const { mutate: createBuilding, isPending: submitting } = useCreateBuilding();
 
-  const canCreate = appUser?.role === "admin" || appUser?.role === "administrator";
+  const { isCondoAdmin: canCreate } = useCondominiumPermissions(condominiumId);
 
   if (!canCreate) {
     return (

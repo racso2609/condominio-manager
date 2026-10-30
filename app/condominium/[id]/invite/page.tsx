@@ -5,6 +5,7 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { PageHeader } from "@/components/PageHeader";
 import { useCondominiumPage } from "@/hooks/useCondominiumPage";
 import { useCondominiumRoles } from "@/lib/queries/useCondominium";
+import { useBuildingsByCondominium } from "@/lib/queries/useBuilding";
 import {
   useCreateInvite,
   useCreateGlobalInvite,
@@ -21,14 +22,25 @@ export default function InviteResidentPage() {
     condominiumId,
     condominium,
     condominiumLoading,
-    isAdminOrManager,
+    isCondoAdmin,
   } = useCondominiumPage();
   const { data: roles = [], isLoading: rolesLoading } =
     useCondominiumRoles(condominiumId);
+  const { data: buildings = [] } = useBuildingsByCondominium(condominiumId);
 
   const [email, setEmail] = useState("");
+  const [role, setRole] = useState<"resident" | "administrator">("resident");
+  const [selectedBuildings, setSelectedBuildings] = useState<string[]>([]);
   const [lastLink, setLastLink] = useState("");
   const [now, setNow] = useState(() => Date.now());
+
+  const toggleBuilding = (buildingId: string) => {
+    setSelectedBuildings((prev) =>
+      prev.includes(buildingId)
+        ? prev.filter((id) => id !== buildingId)
+        : [...prev, buildingId]
+    );
+  };
 
   const { mutate: createInvite, isPending: sending } = useCreateInvite();
   const { mutate: createGlobalInvite, isPending: generatingGlobal } =
@@ -57,17 +69,24 @@ export default function InviteResidentPage() {
   const handleInvite = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !appUser || !condominium) return;
+    if (role === "administrator" && selectedBuildings.length === 0) {
+      alert("Selecciona al menos una torre para el encargado.");
+      return;
+    }
 
     createInvite(
       {
         condominiumId: condominium.id,
         invitedBy: appUser.id,
         email: email.trim(),
+        role,
+        buildings: role === "administrator" ? selectedBuildings : undefined,
       },
       {
-        onSuccess: (role) => {
-          setLastLink(`${BASE_URL}/invite?token=${role.token}`);
+        onSuccess: (createdRole) => {
+          setLastLink(`${BASE_URL}/invite?token=${createdRole.token}`);
           setEmail("");
+          setSelectedBuildings([]);
         },
       }
     );
@@ -98,7 +117,7 @@ export default function InviteResidentPage() {
 
   if (!condominium) return null;
 
-  if (!isAdminOrManager) {
+  if (!isCondoAdmin) {
     return (
       <PermissionDenied message="No tienes permisos para invitar residentes." />
     );
@@ -116,22 +135,73 @@ export default function InviteResidentPage() {
 
       <PageHeader title="Invitar residente" subtitle={condominium.name} />
 
-      <form onSubmit={handleInvite} className="flex gap-3">
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Correo del residente"
-          required
-          className="flex-1 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:placeholder-zinc-500 dark:focus:border-zinc-500"
-        />
-        <button
-          type="submit"
-          disabled={sending || !email.trim()}
-          className="h-10 rounded-full bg-zinc-900 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
-        >
-          {sending ? "Enviando..." : "Invitar"}
-        </button>
+      <form onSubmit={handleInvite} className="flex flex-col gap-3">
+        <div className="flex gap-3">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Correo del invitado"
+            required
+            className="flex-1 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:placeholder-zinc-500 dark:focus:border-zinc-500"
+          />
+          <button
+            type="submit"
+            disabled={sending || !email.trim()}
+            className="h-10 rounded-full bg-zinc-900 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+          >
+            {sending ? "Enviando..." : "Invitar"}
+          </button>
+        </div>
+
+        <div className="flex gap-3">
+          <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+            Rol
+            <select
+              value={role}
+              onChange={(e) =>
+                setRole(e.target.value as "resident" | "administrator")
+              }
+              className="rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-black dark:text-zinc-50 dark:focus:border-zinc-500"
+            >
+              <option value="resident">Residente</option>
+              <option value="administrator">Encargado de torre</option>
+            </select>
+          </label>
+        </div>
+
+        {role === "administrator" && (
+          <div className="flex flex-col gap-2 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-black">
+            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              Torres que administrará
+            </p>
+            {buildings.length === 0 ? (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Este condominio aún no tiene torres.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {buildings.map((b) => {
+                  const active = selectedBuildings.includes(b.id);
+                  return (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => toggleBuilding(b.id)}
+                      className={
+                        active
+                          ? "rounded-full border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white dark:border-zinc-50 dark:bg-zinc-50 dark:text-black"
+                          : "rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                      }
+                    >
+                      {b.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </form>
 
       {lastLink && (

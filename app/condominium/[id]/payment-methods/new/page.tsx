@@ -7,6 +7,7 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { PageHeader } from "@/components/PageHeader";
 import { useAuthContext } from "@/context/authContext";
 import { useCondominium } from "@/lib/queries/useCondominium";
+import { useCondominiumPermissions } from "@/hooks/useCondominiumPermissions";
 import { useCreatePaymentMethod } from "@/lib/mutations/usePaymentMethodMutations";
 import { PaymentMethodType } from "@/lib/types";
 import { FormSkeleton } from "@/components/skeleton";
@@ -63,8 +64,7 @@ export default function NewPaymentMethodPage() {
   const { mutate: createPaymentMethod, isPending: saving } =
     useCreatePaymentMethod();
 
-  const isAdminOrManager =
-    appUser?.role === "admin" || appUser?.role === "administrator";
+  const { isCondoAdmin } = useCondominiumPermissions(condominiumId);
 
   const visibleFields = FIELDS_BY_TYPE[type];
   const isVisible = (field: string) => visibleFields.includes(field);
@@ -122,7 +122,7 @@ export default function NewPaymentMethodPage() {
     return <FormSkeleton titleWidth="w-56" inputCount={7} />;
   }
 
-  if (!isAdminOrManager) {
+  if (!isCondoAdmin) {
     return (
       <PermissionDenied message="No tienes permisos para crear métodos de pago." />
     );

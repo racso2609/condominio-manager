@@ -28,12 +28,20 @@ export interface CondominiumRole {
   user: string;
   role: "administrator" | "resident";
   status: "pending" | "verified";
+  building?: string | null;
   invited_email?: string;
   invited_by?: string;
   token?: string;
   expires_at?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface BuildingManagerAssignment {
+  id: string;
+  role: string;
+  building: string;
+  created_at: string;
 }
 
 export interface Building {

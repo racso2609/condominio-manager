@@ -54,13 +54,23 @@ export default function ResidentsPage() {
     condominium,
     condominiumLoading,
     isAdminOrManager,
+    isCondoAdmin,
+    managedBuildingIds,
   } = useCondominiumPage();
   const { data: roles = [], isLoading: rolesLoading } =
     useCondominiumRoles(condominiumId);
-  const { data: buildings = [], isLoading: buildingsLoading } =
+  const { data: allBuildings = [], isLoading: buildingsLoading } =
     useBuildingsByCondominium(condominiumId);
   const { data: paymentMethods = [], isLoading: methodsLoading } =
     usePaymentMethodsByCondominium(condominiumId);
+
+  const buildings = useMemo(
+    () =>
+      isCondoAdmin
+        ? allBuildings
+        : allBuildings.filter((b) => managedBuildingIds.includes(b.id)),
+    [allBuildings, isCondoAdmin, managedBuildingIds]
+  );
 
   const buildingIds = useMemo(() => buildings.map((b) => b.id), [buildings]);
   const unitsQueries = useUnitsByBuildings(buildingIds);
@@ -253,11 +263,15 @@ export default function ResidentsPage() {
 
   const residentRoles = Object.values(
     roles
-      .filter(
-        (r) =>
-          r.role === "resident" ||
-          (r.role === "administrator" && unitsByOwner[r.user]?.length > 0)
-      )
+      .filter((r) => {
+        if (r.role === "administrator") {
+          return unitsByOwner[r.user]?.length > 0;
+        }
+        if (!isCondoAdmin) {
+          return (unitsByOwner[r.user]?.length ?? 0) > 0;
+        }
+        return true;
+      })
       .reduce<Record<string, CondominiumRole>>((acc, r) => {
         const existing = acc[r.user];
         if (!existing) {

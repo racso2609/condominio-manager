@@ -21,6 +21,7 @@ import { BuildingDetailSkeleton } from "@/components/skeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/Badge";
 import { useCondominiumRoles } from "@/lib/queries/useCondominium";
+import { useCondominiumPermissions } from "@/hooks/useCondominiumPermissions";
 import { AssignOrPreregisterModal } from "@/components/AssignOrPreregisterModal";
 import { AppUser, Unit } from "@/lib/types";
 
@@ -30,6 +31,13 @@ export default function BuildingDetail() {
   const router = useRouter();
   const buildingId = params.buildingId as string;
   const condominiumId = params.id as string;
+
+  const {
+    isAdminOrManager,
+    isCondoAdmin,
+    canManageBuilding,
+    isLoading: permissionsLoading,
+  } = useCondominiumPermissions(condominiumId);
 
   const { data: building, isLoading: buildingLoading } =
     useBuilding(buildingId);
@@ -92,14 +100,28 @@ export default function BuildingDetail() {
   const { mutate: rejectUnitClaim, isPending: rejecting } =
     useRejectUnitClaim();
 
-  const isAdminOrManager =
-    appUser?.role === "admin" || appUser?.role === "administrator";
-
   useEffect(() => {
     if (!buildingLoading && building === null) {
       router.replace(`/condominium/${condominiumId}`);
     }
   }, [buildingLoading, building, router, condominiumId]);
+
+  useEffect(() => {
+    if (
+      !permissionsLoading &&
+      isAdminOrManager &&
+      !canManageBuilding(buildingId)
+    ) {
+      router.replace(`/condominium/${condominiumId}`);
+    }
+  }, [
+    permissionsLoading,
+    isAdminOrManager,
+    canManageBuilding,
+    buildingId,
+    condominiumId,
+    router,
+  ]);
 
   const toggleUnit = (id: string) => {
     setSelected((prev) => {
@@ -223,33 +245,39 @@ export default function BuildingDetail() {
 
         {isAdminOrManager && (
           <div className="flex gap-2">
-            <Button
-              href={`/condominium/${condominiumId}/buildings/${building.id}/edit`}
-              variant="secondary"
-              size="lg"
-            >
-              Editar
-            </Button>
-            <Button
-              href={`/condominium/${condominiumId}/buildings/${building.id}/duplicate`}
-              variant="secondary"
-              size="lg"
-            >
-              Duplicar
-            </Button>
+            {isCondoAdmin && (
+              <>
+                <Button
+                  href={`/condominium/${condominiumId}/buildings/${building.id}/edit`}
+                  variant="secondary"
+                  size="lg"
+                >
+                  Editar
+                </Button>
+                <Button
+                  href={`/condominium/${condominiumId}/buildings/${building.id}/duplicate`}
+                  variant="secondary"
+                  size="lg"
+                >
+                  Duplicar
+                </Button>
+              </>
+            )}
             <Link
               href={`/condominium/${condominiumId}/buildings/${building.id}/aliquots`}
               className="rounded-full border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               Alícuotas
             </Link>
-            <button
-              onClick={handleDeleteBuilding}
-              disabled={deletingBuilding}
-              className="flex h-10 items-center rounded-full border border-red-200 px-5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-900/20"
-            >
-              {deletingBuilding ? "Eliminando..." : "Eliminar"}
-            </button>
+            {isCondoAdmin && (
+              <button
+                onClick={handleDeleteBuilding}
+                disabled={deletingBuilding}
+                className="flex h-10 items-center rounded-full border border-red-200 px-5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-900/20"
+              >
+                {deletingBuilding ? "Eliminando..." : "Eliminar"}
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -9,6 +9,8 @@ import {
   acceptInvite,
   verifyRole,
   deleteCondominiumRole,
+  addBuildingManagerAssignment,
+  removeBuildingManagerAssignment,
 } from "@/lib/services/condominiumService";
 import { queryKeys } from "@/lib/queries/keys";
 
@@ -61,17 +63,26 @@ export function useCreateInvite() {
       condominiumId,
       invitedBy,
       email,
+      role,
+      buildings,
     }: {
       condominiumId: string;
       invitedBy: string;
       email: string;
-    }) => createInvite(condominiumId, invitedBy, email),
+      role?: "administrator" | "resident";
+      buildings?: string[];
+    }) => createInvite(condominiumId, invitedBy, email, { role, buildings }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.condominiums.roles(variables.condominiumId),
       });
       queryClient.invalidateQueries({
         queryKey: queryKeys.condominiums.pendingRoles(variables.condominiumId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.condominiums.buildingManagers(
+          variables.condominiumId
+        ),
       });
     },
   });
@@ -138,6 +149,52 @@ export function useDeleteCondominiumRole() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.condominiums.all(),
       });
+    },
+  });
+}
+
+export function useAddBuildingManagerAssignment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      roleId,
+      building,
+    }: {
+      roleId: string;
+      building: string;
+      condominiumId: string;
+    }) => addBuildingManagerAssignment(roleId, building),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.condominiums.buildingManagers(
+          variables.condominiumId
+        ),
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.condominiums.all() });
+    },
+  });
+}
+
+export function useRemoveBuildingManagerAssignment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      roleId,
+      building,
+    }: {
+      roleId: string;
+      building: string;
+      condominiumId: string;
+    }) => removeBuildingManagerAssignment(roleId, building),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.condominiums.buildingManagers(
+          variables.condominiumId
+        ),
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.condominiums.all() });
     },
   });
 }

@@ -8,7 +8,10 @@ import { Badge } from "@/components/Badge";
 import { PageHeader } from "@/components/PageHeader";
 import { useCondominiumPage } from "@/hooks/useCondominiumPage";
 import { useBuildingsByCondominium } from "@/lib/queries/useBuilding";
-import { useExpensesByCondominium } from "@/lib/queries/useExpense";
+import {
+  useExpensesByCondominium,
+  useExpensesByBuildings,
+} from "@/lib/queries/useExpense";
 import { useEntriesByExpenses } from "@/lib/queries/useExpenseEntry";
 import {
   isExpenseCancelled,
@@ -26,11 +29,35 @@ export default function ExpensesPage() {
     condominium,
     condominiumLoading,
     isAdminOrManager,
+    isCondoAdmin,
+    managedBuildingIds,
   } = useCondominiumPage();
-  const { data: buildings = [], isLoading: buildingsLoading } =
+  const { data: allBuildings = [], isLoading: buildingsLoading } =
     useBuildingsByCondominium(condominiumId);
-  const { data: expenses = [], isLoading: expensesLoading } =
+
+  const buildings = useMemo(
+    () =>
+      isCondoAdmin
+        ? allBuildings
+        : allBuildings.filter((b) => managedBuildingIds.includes(b.id)),
+    [allBuildings, isCondoAdmin, managedBuildingIds]
+  );
+
+  const buildingIds = useMemo(() => buildings.map((b) => b.id), [buildings]);
+
+  const { data: condoExpenses = [], isLoading: condoExpensesLoading } =
     useExpensesByCondominium(condominiumId);
+  const buildingExpensesQueries = useExpensesByBuildings(buildingIds);
+
+  const expenses = useMemo(() => {
+    if (!isCondoAdmin) {
+      return buildingExpensesQueries.flatMap((q) => q.data ?? []);
+    }
+    return condoExpenses;
+  }, [isCondoAdmin, condoExpenses, buildingExpensesQueries]);
+
+  const expensesLoading =
+    condoExpensesLoading || buildingExpensesQueries.some((q) => q.isLoading);
 
   const [activeTab, setActiveTab] = useState<ExpenseTab>("active");
 

@@ -12,6 +12,8 @@ import {
   getPendingInvitesByEmail,
   getInviteByToken,
   getUserCondominiumRole,
+  getManagedBuildingIds,
+  getBuildingManagers,
 } from "@/lib/services/condominiumService";
 import { Condominium } from "@/lib/types";
 import { queryKeys } from "./keys";
@@ -59,6 +61,33 @@ export function useUserCondominiumRole(
         ? () => getUserCondominiumRole(userId, condominiumId)
         : skipToken,
     enabled: Boolean(userId && condominiumId),
+  });
+}
+
+export function useManagedBuildingIds(
+  userId: string | undefined,
+  condominiumId: string | undefined
+) {
+  return useQuery({
+    queryKey: queryKeys.condominiums.managedBuildings(
+      condominiumId ?? "",
+      userId ?? ""
+    ),
+    queryFn:
+      userId && condominiumId
+        ? () => getManagedBuildingIds(userId, condominiumId)
+        : skipToken,
+    enabled: Boolean(userId && condominiumId),
+  });
+}
+
+export function useBuildingManagers(condominiumId?: string) {
+  return useQuery({
+    queryKey: queryKeys.condominiums.buildingManagers(condominiumId ?? ""),
+    queryFn: condominiumId
+      ? () => getBuildingManagers(condominiumId)
+      : skipToken,
+    enabled: Boolean(condominiumId),
   });
 }
 

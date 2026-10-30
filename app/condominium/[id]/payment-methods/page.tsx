@@ -16,7 +16,7 @@ export default function PaymentMethodsPage() {
     condominiumId,
     condominium,
     condominiumLoading,
-    isAdminOrManager,
+    isCondoAdmin,
   } = useCondominiumPage();
   const { data: methods = [], isLoading: methodsLoading } =
     usePaymentMethodsByCondominium(condominiumId);
@@ -37,7 +37,7 @@ export default function PaymentMethodsPage() {
     return <PageSkeleton titleWidth="w-48" cardCount={3} cardLines={3} />;
   }
 
-  if (!isAdminOrManager) {
+  if (!isCondoAdmin) {
     return (
       <PermissionDenied message="No tienes permisos para gestionar métodos de pago." />
     );

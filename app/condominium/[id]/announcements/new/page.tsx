@@ -6,6 +6,7 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
+import { useCondominiumPermissions } from "@/hooks/useCondominiumPermissions";
 import { useCreateAnnouncement } from "@/lib/mutations/useAnnouncementMutations";
 import { PermissionDenied } from "@/components/PermissionDenied";
 import { FormField, Input, Textarea } from "@/components/Form";
@@ -22,8 +23,7 @@ export default function NewAnnouncementPage() {
   const { mutate: createAnnouncement, isPending: saving } =
     useCreateAnnouncement();
 
-  const isAdminOrManager =
-    appUser?.role === "admin" || appUser?.role === "administrator";
+  const { isAdminOrManager } = useCondominiumPermissions(params.id as string);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     handleFileInput(e, files, setFiles);

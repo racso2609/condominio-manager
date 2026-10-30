@@ -24,9 +24,20 @@ export default function CondominiumDetail() {
     condominium,
     condominiumLoading,
     isAdminOrManager,
+    isCondoAdmin,
+    isBuildingManager,
+    managedBuildingIds,
   } = useCondominiumPage();
-  const { data: buildings = [], isLoading: buildingsLoading } =
+  const { data: allBuildings = [], isLoading: buildingsLoading } =
     useBuildingsByCondominium(condominiumId);
+
+  const buildings = useMemo(
+    () =>
+      isCondoAdmin
+        ? allBuildings
+        : allBuildings.filter((b) => managedBuildingIds.includes(b.id)),
+    [allBuildings, isCondoAdmin, managedBuildingIds]
+  );
   const { data: userRole, isLoading: roleLoading } = useUserCondominiumRole(
     appUser?.id,
     condominiumId
@@ -120,12 +131,25 @@ export default function CondominiumDetail() {
               {condominium.address}
             </p>
           )}
-          <span className="mt-2 inline-block">
+          <span className="mt-2 inline-flex items-center gap-2">
             <StatusBadge status={condominium.status} />
+            {isBuildingManager && (
+              <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                Encargado
+                {buildings.length > 0
+                  ? ` · ${buildings.map((b) => b.name).join(", ")}`
+                  : ""}
+              </span>
+            )}
+            {isCondoAdmin && (
+              <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                Administrador
+              </span>
+            )}
           </span>
         </div>
 
-        {isAdminOrManager && (
+        {isCondoAdmin && (
           <div className="flex gap-2">
             {condominium.status === "draft" && (
               <Button
@@ -235,26 +259,30 @@ export default function CondominiumDetail() {
               Gastos
             </Button>
             <Button
-              href={`/condominium/${condominium.id}/invite`}
-              variant="secondary"
-              size="md"
-            >
-              Invitar residentes
-            </Button>
-            <Button
               href={`/condominium/${condominium.id}/residents`}
               variant="secondary"
               size="md"
             >
               Gestionar residentes
             </Button>
-            <Button
-              href={`/condominium/${condominium.id}/payment-methods`}
-              variant="secondary"
-              size="md"
-            >
-              Métodos de pago
-            </Button>
+            {isCondoAdmin && (
+              <>
+                <Button
+                  href={`/condominium/${condominium.id}/invite`}
+                  variant="secondary"
+                  size="md"
+                >
+                  Invitar residentes
+                </Button>
+                <Button
+                  href={`/condominium/${condominium.id}/payment-methods`}
+                  variant="secondary"
+                  size="md"
+                >
+                  Métodos de pago
+                </Button>
+              </>
+            )}
           </>
         )}
         <Button

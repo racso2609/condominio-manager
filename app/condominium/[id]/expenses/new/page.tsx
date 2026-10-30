@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/Button";
 import { useAuthContext } from "@/context/authContext";
 import { useCondominium } from "@/lib/queries/useCondominium";
+import { useCondominiumPermissions } from "@/hooks/useCondominiumPermissions";
 import { useBuildingsByCondominium } from "@/lib/queries/useBuilding";
 import { useUnitsByBuildings } from "@/lib/queries/useUnit";
 import { useCreateExpense } from "@/lib/mutations/useExpenseMutations";
@@ -24,11 +25,31 @@ export default function NewExpensePage() {
 
   const { data: condominium, isLoading: condominiumLoading } =
     useCondominium(condominiumId);
-  const { data: buildings = [], isLoading: buildingsLoading } =
+  const { data: allBuildings = [], isLoading: buildingsLoading } =
     useBuildingsByCondominium(condominiumId);
 
+  const {
+    isAdminOrManager,
+    isCondoAdmin,
+    managedBuildingIds,
+    isLoading: permissionsLoading,
+  } = useCondominiumPermissions(condominiumId);
+
+  const buildings = useMemo(
+    () =>
+      isCondoAdmin
+        ? allBuildings
+        : allBuildings.filter((b) => managedBuildingIds.includes(b.id)),
+    [allBuildings, isCondoAdmin, managedBuildingIds]
+  );
+
   const [scope, setScope] = useState<"condominium" | "building">("condominium");
-  const [selectedBuilding, setSelectedBuilding] = useState(buildings[0]?.id ?? "");
+  const [selectedBuilding, setSelectedBuilding] = useState("");
+
+  const effectiveScope: "condominium" | "building" = isCondoAdmin
+    ? scope
+    : "building";
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [items, setItems] = useState<ExpenseItem[]>([
@@ -81,16 +102,13 @@ export default function NewExpensePage() {
   }, [unitsQueries]);
 
   const scopeUnits = useMemo(() => {
-    if (scope === "condominium") return allUnits;
+    if (effectiveScope === "condominium") return allUnits;
     return allUnits.filter((u) => u.building === effectiveSelectedBuilding);
-  }, [scope, allUnits, effectiveSelectedBuilding]);
+  }, [effectiveScope, allUnits, effectiveSelectedBuilding]);
 
   const { mutate: createExpense, isPending: creatingExpense } =
     useCreateExpense();
   const { mutateAsync: createExpenseEntriesAsync } = useCreateExpenseEntries();
-
-  const isAdminOrManager =
-    appUser?.role === "admin" || appUser?.role === "administrator";
 
   useEffect(() => {
     if (!condominiumLoading && condominium === null) {
@@ -148,8 +166,8 @@ export default function NewExpensePage() {
 
     createExpense(
       {
-        condominium: scope === "condominium" ? condominiumId : undefined,
-        building: scope === "building" ? effectiveSelectedBuilding : undefined,
+        condominium: effectiveScope === "condominium" ? condominiumId : undefined,
+        building: effectiveScope === "building" ? effectiveSelectedBuilding : undefined,
         title: title.trim(),
         description: description.trim() || undefined,
         items: validItems,
@@ -169,7 +187,8 @@ export default function NewExpensePage() {
     );
   };
 
-  const loading = condominiumLoading || buildingsLoading;
+  const loading =
+    condominiumLoading || buildingsLoading || permissionsLoading;
 
   if (loading) {
     return <FormSkeleton titleWidth="w-40" inputCount={6} />;
@@ -204,17 +223,19 @@ export default function NewExpensePage() {
             <legend className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
               Ámbito
             </legend>
-            <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-              <input
-                type="radio"
-                name="scope"
-                value="condominium"
-                checked={scope === "condominium"}
-                onChange={() => setScope("condominium")}
-                className="accent-zinc-900 dark:accent-zinc-50"
-              />
-              Todo el condominio
-            </label>
+            {isCondoAdmin && (
+              <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+                <input
+                  type="radio"
+                  name="scope"
+                  value="condominium"
+                  checked={scope === "condominium"}
+                  onChange={() => setScope("condominium")}
+                  className="accent-zinc-900 dark:accent-zinc-50"
+                />
+                Todo el condominio
+              </label>
+            )}
             <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
               <input
                 type="radio"

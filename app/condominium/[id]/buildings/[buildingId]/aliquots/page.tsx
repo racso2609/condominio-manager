@@ -9,10 +9,10 @@ import { EmptyState } from "@/components/EmptyState";
 import { PermissionDenied } from "@/components/PermissionDenied";
 import { BuildingDetailSkeleton } from "@/components/skeleton";
 import { Input } from "@/components/Form";
-import { useAuthContext } from "@/context/authContext";
 import { useBuilding } from "@/lib/queries/useBuilding";
 import { useUnitsByBuilding } from "@/lib/queries/useUnit";
 import { useBatchUpdateAliquots } from "@/lib/mutations/useUnitMutations";
+import { useCondominiumPermissions } from "@/hooks/useCondominiumPermissions";
 
 function parseAliquot(raw: string | undefined): number | null {
   if (!raw || raw.trim() === "") return null;
@@ -21,7 +21,6 @@ function parseAliquot(raw: string | undefined): number | null {
 }
 
 export default function BuildingAliquotsPage() {
-  const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
   const condominiumId = params.id as string;
@@ -44,8 +43,7 @@ export default function BuildingAliquotsPage() {
   const { mutateAsync: batchUpdateAliquots, isPending: saving } =
     useBatchUpdateAliquots();
 
-  const isAdminOrManager =
-    appUser?.role === "admin" || appUser?.role === "administrator";
+  const { canManageBuilding } = useCondominiumPermissions(condominiumId);
 
   useEffect(() => {
     if (!buildingLoading && building === null) {
@@ -72,7 +70,7 @@ export default function BuildingAliquotsPage() {
 
   if (!building) return null;
 
-  if (!isAdminOrManager) {
+  if (!canManageBuilding(buildingId)) {
     return (
       <PermissionDenied
         message="No tienes permisos para gestionar las alícuotas."

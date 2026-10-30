@@ -4,12 +4,11 @@ import { FormEvent, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Breadcrumb } from "@/components/Breadcrumb";
-import { useAuthContext } from "@/context/authContext";
 import { getUnitNumber } from "@/lib/services/unitService";
 import { useGenerateUnits } from "@/lib/mutations/useUnitMutations";
+import { useCondominiumPermissions } from "@/hooks/useCondominiumPermissions";
 
 export default function GenerateUnits() {
-  const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
   const buildingId = params.buildingId as string;
@@ -27,8 +26,9 @@ export default function GenerateUnits() {
 
   const { mutate: generateUnits, isPending: submitting } = useGenerateUnits();
 
-  const canCreate =
-    appUser?.role === "admin" || appUser?.role === "administrator";
+  const { canManageBuilding } = useCondominiumPermissions(condominiumId);
+
+  const canCreate = canManageBuilding(buildingId);
 
   if (!canCreate) {
     return (

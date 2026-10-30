@@ -4,8 +4,8 @@ import { FormEvent, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Breadcrumb } from "@/components/Breadcrumb";
-import { useAuthContext } from "@/context/authContext";
 import { useBuilding } from "@/lib/queries/useBuilding";
+import { useCondominiumPermissions } from "@/hooks/useCondominiumPermissions";
 import { useUpdateBuilding } from "@/lib/mutations/useBuildingMutations";
 import { Building } from "@/lib/types";
 import { FormSkeleton } from "@/components/skeleton";
@@ -130,7 +130,6 @@ function EditBuildingForm({
 }
 
 export default function EditBuilding() {
-  const { appUser } = useAuthContext();
   const params = useParams();
   const router = useRouter();
   const buildingId = params.buildingId as string;
@@ -138,8 +137,7 @@ export default function EditBuilding() {
 
   const { data: building, isLoading } = useBuilding(buildingId);
 
-  const canEdit =
-    appUser?.role === "admin" || appUser?.role === "administrator";
+  const { isCondoAdmin: canEdit } = useCondominiumPermissions(condominiumId);
 
   if (!canEdit) {
     return (
