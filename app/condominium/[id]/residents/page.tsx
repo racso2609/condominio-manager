@@ -29,6 +29,8 @@ import {
   useDeleteCondominiumRole,
   useAddBuildingManagerAssignment,
   useRemoveBuildingManagerAssignment,
+  usePromoteToBuildingManager,
+  useDemoteToResident,
 } from "@/lib/mutations/useCondominiumMutations";
 import { useMarkEntryAsPaid } from "@/lib/mutations/useExpenseEntryMutations";
 import {
@@ -181,10 +183,59 @@ export default function ResidentsPage() {
   const { mutate: addManagerAssignment } = useAddBuildingManagerAssignment();
   const { mutate: removeManagerAssignment } =
     useRemoveBuildingManagerAssignment();
+  const { mutate: promoteToManager, isPending: promoting } =
+    usePromoteToBuildingManager();
+  const { mutate: demoteToResident } = useDemoteToResident();
   const [addingTowerForRole, setAddingTowerForRole] = useState<string | null>(
     null
   );
   const [newTowerId, setNewTowerId] = useState("");
+  const [promotingRoleId, setPromotingRoleId] = useState<string | null>(null);
+  const [promoteTowerIds, setPromoteTowerIds] = useState<string[]>([]);
+
+  const togglePromoteTower = (buildingId: string) => {
+    setPromoteTowerIds((prev) =>
+      prev.includes(buildingId)
+        ? prev.filter((id) => id !== buildingId)
+        : [...prev, buildingId]
+    );
+  };
+
+  const handleStartPromote = (roleId: string) => {
+    setPromotingRoleId(roleId);
+    setPromoteTowerIds([]);
+  };
+
+  const handlePromote = (roleId: string) => {
+    if (promoteTowerIds.length === 0) {
+      alert("Selecciona al menos una torre.");
+      return;
+    }
+    promoteToManager(
+      { roleId, condominiumId, buildings: promoteTowerIds },
+      {
+        onSuccess: () => {
+          setPromotingRoleId(null);
+          setPromoteTowerIds([]);
+        },
+        onError: (e) =>
+          alert(e instanceof Error ? e.message : "Error al promover"),
+      }
+    );
+  };
+
+  const handleDemote = (roleId: string, name: string) => {
+    if (
+      !window.confirm(
+        `¿Quitar el rol de encargado a ${name}? Volverá a ser residente.`
+      )
+    )
+      return;
+    demoteToResident(
+      { roleId, condominiumId },
+      { onError: () => alert("Error al quitar el rol de encargado") }
+    );
+  };
 
   const handleReject = (unitId: string) => {
     if (
@@ -544,17 +595,80 @@ export default function ResidentsPage() {
                       </Button>
                     </div>
 
-                    {owner && isAdminOrManager && (
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="xs"
-                        onClick={() => setEditingResident(owner)}
-                      >
-                        ✏️ Editar contacto
-                      </Button>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {isCondoAdmin &&
+                        r.role === "resident" &&
+                        r.status === "verified" &&
+                        !!r.user && (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="xs"
+                            onClick={() => handleStartPromote(r.id)}
+                          >
+                            🛡️ Hacer encargado
+                          </Button>
+                        )}
+                      {owner && isAdminOrManager && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="xs"
+                          onClick={() => setEditingResident(owner)}
+                        >
+                          ✏️ Editar contacto
+                        </Button>
+                      )}
+                    </div>
                   </div>
+
+                  {promotingRoleId === r.id && (
+                    <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-black">
+                      <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                        Torres que administrará {owner?.name ?? ""}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {allBuildings.map((b) => {
+                          const active = promoteTowerIds.includes(b.id);
+                          return (
+                            <button
+                              key={b.id}
+                              type="button"
+                              onClick={() => togglePromoteTower(b.id)}
+                              className={
+                                active
+                                  ? "rounded-full border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white dark:border-zinc-50 dark:bg-zinc-50 dark:text-black"
+                                  : "rounded-full border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                              }
+                            >
+                              {b.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          onClick={() => handlePromote(r.id)}
+                          disabled={promoting || promoteTowerIds.length === 0}
+                        >
+                          {promoting ? "Guardando..." : "Confirmar encargado"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setPromotingRoleId(null);
+                            setPromoteTowerIds([]);
+                          }}
+                          disabled={promoting}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
 
                   {owner?.notes && (
                     <div className="rounded-xl border border-amber-200/60 bg-amber-50/50 px-4 py-2.5 text-xs text-amber-900 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-300">
@@ -800,6 +914,14 @@ export default function ResidentsPage() {
                           ? "Verificado"
                           : "Pendiente"}
                       </Badge>
+                      <Button
+                        type="button"
+                        variant="danger"
+                        size="xs"
+                        onClick={() => handleDemote(managerRole.id, name)}
+                      >
+                        Quitar rol
+                      </Button>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">

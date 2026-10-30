@@ -203,6 +203,60 @@ export async function removeBuildingManagerAssignment(
   if (error) throw error;
 }
 
+export async function promoteToBuildingManager(
+  roleId: string,
+  condominiumId: string,
+  buildings: string[]
+): Promise<void> {
+  if (buildings.length === 0) {
+    throw new Error("Selecciona al menos una torre");
+  }
+
+  const { data: validBuildings, error: buildingsError } = await supabase
+    .from(BUILDING_TABLE)
+    .select("id")
+    .eq("condominium", condominiumId)
+    .in("id", buildings);
+
+  if (buildingsError) throw buildingsError;
+  if ((validBuildings ?? []).length !== buildings.length) {
+    throw new Error("Una de las torres no pertenece a este condominio");
+  }
+
+  const now = new Date().toISOString();
+  const assignments = buildings.map((building) => ({
+    id: generateId(),
+    role: roleId,
+    building,
+    created_at: now,
+  }));
+
+  const { error: assignError } = await supabase
+    .from(ASSIGNMENT_TABLE)
+    .upsert(assignments, { onConflict: "role,building", ignoreDuplicates: true });
+  if (assignError) throw assignError;
+
+  const { error: roleError } = await supabase
+    .from(ROLE_TABLE)
+    .update({ role: "administrator", updated_at: now })
+    .eq("id", roleId);
+  if (roleError) throw roleError;
+}
+
+export async function demoteToResident(roleId: string): Promise<void> {
+  const { error: assignError } = await supabase
+    .from(ASSIGNMENT_TABLE)
+    .delete()
+    .eq("role", roleId);
+  if (assignError) throw assignError;
+
+  const { error: roleError } = await supabase
+    .from(ROLE_TABLE)
+    .update({ role: "resident", updated_at: new Date().toISOString() })
+    .eq("id", roleId);
+  if (roleError) throw roleError;
+}
+
 export async function createInvite(
   condominiumId: string,
   invitedBy: string,

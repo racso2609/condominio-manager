@@ -11,6 +11,8 @@ import {
   deleteCondominiumRole,
   addBuildingManagerAssignment,
   removeBuildingManagerAssignment,
+  promoteToBuildingManager,
+  demoteToResident,
 } from "@/lib/services/condominiumService";
 import { queryKeys } from "@/lib/queries/keys";
 
@@ -166,6 +168,57 @@ export function useAddBuildingManagerAssignment() {
       condominiumId: string;
     }) => addBuildingManagerAssignment(roleId, building),
     onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.condominiums.buildingManagers(
+          variables.condominiumId
+        ),
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.condominiums.all() });
+    },
+  });
+}
+
+export function usePromoteToBuildingManager() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      roleId,
+      condominiumId,
+      buildings,
+    }: {
+      roleId: string;
+      condominiumId: string;
+      buildings: string[];
+    }) => promoteToBuildingManager(roleId, condominiumId, buildings),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.condominiums.roles(variables.condominiumId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.condominiums.buildingManagers(
+          variables.condominiumId
+        ),
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.condominiums.all() });
+    },
+  });
+}
+
+export function useDemoteToResident() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      roleId,
+    }: {
+      roleId: string;
+      condominiumId: string;
+    }) => demoteToResident(roleId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.condominiums.roles(variables.condominiumId),
+      });
       queryClient.invalidateQueries({
         queryKey: queryKeys.condominiums.buildingManagers(
           variables.condominiumId

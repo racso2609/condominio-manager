@@ -401,3 +401,43 @@ Add an optional dev seed (do **not** modify `009_marapa_marina_condo.sql`) with 
 - **`is_condominium_admin` search_path:** existing functions lack `SET search_path`; the new helpers set it. Consider hardening the old ones in the same migration.
 - **Backfill:** existing condo admins have `building = NULL` and zero assignments after the migration (correct default = full condo).
 - **Assignment lifecycle:** assignments are created at invite time (referencing a `pending` role) and only take effect once the role is `verified`. Deleting the role cascades assignments (`ON DELETE CASCADE`). Deleting a building cascades its assignments too.
+
+---
+
+## 11. Follow-up — scope enforcement + promotion (migration 011)
+
+### 11.1 Security fix: `is_condominium_admin` did not respect building scope
+
+Migration 010 redefined the write policies for `units`, building-scoped `expenses`, `expense_entries` and `announcements` to use `is_building_staff`, but **left `is_condominium_admin` unchanged**: it still returned true for *any* verified administrator, including building managers. Every policy that still calls `is_condominium_admin` (condominium_roles write, buildings insert/update/delete, condominium-scoped expenses, payment_methods, condominiums update/labels) therefore granted a building manager full condominium-admin power.
+
+Migration `011_scope_condo_admin.sql` redefines:
+
+```sql
+is_condominium_admin(condominium_id) =
+  verified administrator of the condominium WITH ZERO building assignments
+```
+
+Because every policy calls this one function, the fix propagates everywhere without rewriting each policy. A building manager now passes only `is_building_staff(b)` for assigned buildings.
+
+Also added:
+- `is_condominium_member` (re-declared with `SET search_path`).
+- `is_condominium_administrator(condominium_id)` — verified administrator regardless of scope.
+- Trigger `trg_enforce_role_change_authority` on `condominium_roles` — blocks a role-type change (`resident` ↔ `administrator`) unless the caller is a full condominium admin. Managers cannot promote/demote.
+
+### 11.2 Existing condominium admins
+
+Untouched by design: they are `administrator` + 0 assignments, which is exactly the "full condominium admin" definition. No assignment rows are created for them.
+
+### 11.3 Promotion / demotion (no duplicate rows)
+
+A member is promoted/demoted by **updating the same `condominium_roles` row** (keeps `getUserCondominiumRole().single()` valid and preserves ownership/debt state):
+
+- `promoteToBuildingManager(roleId, condominiumId, buildings[])` — validates buildings ∈ condo, upserts `building_manager_assignments`, then sets `role='administrator'`. With assignments → building manager. With none → allowed but creates a full condo admin (only meaningful via seed).
+- `demoteToResident(roleId)` — deletes the role's assignments, then sets `role='resident'`.
+
+A managed owner keeps their units/payments/debt (the role change is additive to their property condition).
+
+### 11.4 UI (residents page)
+
+- Each verified resident row (condo admin only): **"🛡️ Hacer encargado"** → multi-select towers → `promoteToBuildingManager`.
+- "Encargados de torre" section: **"Quitar rol"** → `demoteToResident` (confirm), plus the existing add/remove tower chips.
