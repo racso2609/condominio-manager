@@ -6,15 +6,12 @@ import {
   CondominiumMembership,
   pickPrimaryRole,
 } from "@/lib/types";
+import { generateId } from "@/lib/utils/id";
 
 const CONDO_TABLE = "condominiums";
 const ROLE_TABLE = "condominium_roles";
 const BUILDING_TABLE = "buildings";
 const ASSIGNMENT_TABLE = "building_manager_assignments";
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
 
 function generateToken(): string {
   return crypto.randomUUID();
@@ -322,11 +319,36 @@ export async function createInvite(
     }
   }
 
+  const trimmedEmail = email.trim().toLowerCase();
+
+  // 1. Check if an active registered/offline user with this email already belongs to this condominium
+  const { data: userWithEmail, error: userError } = await supabase
+    .from("users")
+    .select("id")
+    .eq("email", trimmedEmail)
+    .maybeSingle();
+
+  if (userError) throw userError;
+
+  if (userWithEmail?.id) {
+    const { data: existingUserRole, error: roleCheckError } = await supabase
+      .from(ROLE_TABLE)
+      .select("id")
+      .eq("condominium", condominiumId)
+      .eq("user", userWithEmail.id);
+
+    if (roleCheckError) throw roleCheckError;
+    if (existingUserRole && existingUserRole.length > 0) {
+      throw new Error("El usuario con este correo ya es parte de este condominio");
+    }
+  }
+
+  // 2. Check if there's already a pending invitation for this email in this condominium
   const { data: existing, error: existingError } = await supabase
     .from(ROLE_TABLE)
     .select("*")
     .eq("condominium", condominiumId)
-    .eq("invited_email", email)
+    .eq("invited_email", trimmedEmail)
     .is("user", null);
 
   if (existingError) throw existingError;
@@ -345,7 +367,7 @@ export async function createInvite(
     user: null as string | null,
     role,
     status: "pending" as const,
-    invited_email: email,
+    invited_email: trimmedEmail,
     invited_by: invitedBy,
     token: generateToken(),
     expires_at: expiresAt.toISOString(),

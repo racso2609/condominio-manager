@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Button } from "@/components/Button";
@@ -37,11 +37,17 @@ export default function BuildingAliquotsPage() {
     error: unitsError,
   } = useUnitsByBuilding(buildingId);
 
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [initialized, setInitialized] = useState(false);
+  const [userValues, setUserValues] = useState<Record<string, string>>({});
 
-  const { mutateAsync: batchUpdateAliquots, isPending: saving } =
-    useBatchUpdateAliquots();
+  const values = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const u of units) {
+      map[u.id] = userValues[u.id] !== undefined
+        ? userValues[u.id]
+        : (u.aliquot != null ? String(u.aliquot) : "");
+    }
+    return map;
+  }, [units, userValues]);
 
   const { canManageBuilding } = useCondominiumPermissions(condominiumId);
 
@@ -50,17 +56,6 @@ export default function BuildingAliquotsPage() {
       router.replace(`/condominium/${condominiumId}`);
     }
   }, [buildingLoading, building, router, condominiumId]);
-
-  useEffect(() => {
-    if (!initialized && units.length > 0) {
-      const init: Record<string, string> = {};
-      units.forEach((u) => {
-        init[u.id] = u.aliquot != null ? String(u.aliquot) : "";
-      });
-      setValues(init);
-      setInitialized(true);
-    }
-  }, [units, initialized]);
 
   const loading = buildingLoading || unitsLoading;
 
@@ -106,7 +101,7 @@ export default function BuildingAliquotsPage() {
     units.forEach((u) => {
       next[u.id] = String(equal);
     });
-    setValues(next);
+    setUserValues(next);
   };
 
   const handleSave = async () => {
@@ -188,7 +183,7 @@ export default function BuildingAliquotsPage() {
                         max="100"
                         value={values[u.id] ?? ""}
                         onChange={(e) =>
-                          setValues((prev) => ({
+                          setUserValues((prev) => ({
                             ...prev,
                             [u.id]: e.target.value,
                           }))

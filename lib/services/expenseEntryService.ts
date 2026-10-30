@@ -1,13 +1,10 @@
 import { supabase } from "@/lib/supabase";
 import { generateStorageFileName } from "@/lib/utils/storage";
 import { ExpenseEntry, PaginatedExpenseEntries } from "@/lib/types";
+import { generateId } from "@/lib/utils/id";
 
 const TABLE = "expense_entries";
 const STORAGE_BUCKET = "condominios";
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
 
 export async function createExpenseEntry(data: {
   expense: string;

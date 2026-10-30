@@ -1,13 +1,10 @@
 import { supabase } from "@/lib/supabase";
 import { generateStorageFileName } from "@/lib/utils/storage";
 import { Announcement, AnnouncementFile } from "@/lib/types";
+import { generateId } from "@/lib/utils/id";
 
 const TABLE = "announcements";
 const STORAGE_BUCKET = "condominios";
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
 
 async function uploadFiles(
   files: File[],

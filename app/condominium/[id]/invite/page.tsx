@@ -9,6 +9,7 @@ import { useBuildingsByCondominium } from "@/lib/queries/useBuilding";
 import {
   useCreateInvite,
   useCreateGlobalInvite,
+  useDeleteCondominiumRole,
 } from "@/lib/mutations/useCondominiumMutations";
 import { CondominiumRole } from "@/lib/types";
 import { InviteSkeleton } from "@/components/skeleton";
@@ -45,6 +46,8 @@ export default function InviteResidentPage() {
   const { mutate: createInvite, isPending: sending } = useCreateInvite();
   const { mutate: createGlobalInvite, isPending: generatingGlobal } =
     useCreateGlobalInvite();
+  const { mutate: deleteCondominiumRole, isPending: deletingRole } =
+    useDeleteCondominiumRole();
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 60000);
@@ -105,9 +108,27 @@ export default function InviteResidentPage() {
     navigator.clipboard.writeText(`${BASE_URL}/invite?token=${token}`);
   };
 
-  const copyFromRole = (role: CondominiumRole) => {
-    if (role.token) copyLink(role.token);
+  const handleDeleteInvite = (roleId: string, emailOrLabel: string) => {
+    if (
+      !window.confirm(
+        `¿Eliminar la invitación para "${emailOrLabel}"? El enlace dejará de funcionar.`
+      )
+    ) {
+      return;
+    }
+    deleteCondominiumRole(roleId, {
+      onError: () => alert("Error al eliminar la invitación"),
+    });
   };
+
+  const pendingInvites = useMemo(
+    () => tokenRoles.filter((r) => !r.user && !isExpired(r)),
+    [tokenRoles, now]
+  );
+  const pastInvites = useMemo(
+    () => tokenRoles.filter((r) => r.user || isExpired(r)),
+    [tokenRoles, now]
+  );
 
   const loading = condominiumLoading || rolesLoading;
 
@@ -254,13 +275,66 @@ export default function InviteResidentPage() {
         )}
       </div>
 
-      {tokenRoles.length > 0 && (
+      {pendingInvites.length > 0 && (
         <section>
           <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            Invitaciones enviadas
+            Invitaciones pendientes ({pendingInvites.length})
           </h2>
           <div className="flex flex-col gap-2">
-            {tokenRoles.map((r) => (
+            {pendingInvites.map((r) => {
+              const label = r.invited_email ?? "Link grupal";
+              return (
+                <div
+                  key={r.id}
+                  className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-black"
+                >
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                      {label}
+                    </p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {r.role === "administrator"
+                        ? "Encargado de torre"
+                        : "Residente"}{" "}
+                      ·{" "}
+                      {r.expires_at
+                        ? `Expira el ${new Date(r.expires_at).toLocaleDateString()}`
+                        : "Sin fecha de expiración"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {r.token && (
+                      <button
+                        type="button"
+                        onClick={() => copyLink(r.token!)}
+                        className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                      >
+                        Copiar link
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteInvite(r.id, label)}
+                      disabled={deletingRole}
+                      className="rounded-full border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/30"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {pastInvites.length > 0 && (
+        <section>
+          <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+            Historial de invitaciones ({pastInvites.length})
+          </h2>
+          <div className="flex flex-col gap-2">
+            {pastInvites.map((r) => (
               <div
                 key={r.id}
                 className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-black"
@@ -270,23 +344,9 @@ export default function InviteResidentPage() {
                     {r.invited_email ?? "Link grupal"}
                   </p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {r.user
-                      ? "Aceptada"
-                      : isExpired(r)
-                        ? "Expirada"
-                        : r.expires_at
-                          ? `Pendiente — expira ${new Date(r.expires_at).toLocaleDateString()}`
-                          : "Pendiente"}
+                    {r.user ? "Aceptada" : "Expirada"}
                   </p>
                 </div>
-                {r.token && !isExpired(r) && (!r.user || !r.invited_email) && (
-                  <button
-                    onClick={() => copyFromRole(r)}
-                    className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                  >
-                    Copiar link
-                  </button>
-                )}
               </div>
             ))}
           </div>

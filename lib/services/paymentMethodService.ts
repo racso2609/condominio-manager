@@ -1,11 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import { PaymentMethod, PaymentMethodType } from "@/lib/types";
+import { generateId } from "@/lib/utils/id";
 
 const TABLE = "payment_methods";
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
 
 export interface CreatePaymentMethodInput {
   condominium: string;

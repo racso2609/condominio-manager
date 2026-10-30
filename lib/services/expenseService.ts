@@ -1,12 +1,9 @@
 import { supabase } from "@/lib/supabase";
 import { Expense, ExpenseItem } from "@/lib/types";
 import { deleteUnpaidEntriesByExpense } from "./expenseEntryService";
+import { generateId } from "@/lib/utils/id";
 
 const TABLE = "expenses";
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
 
 function calculateTotalFromItems(items?: ExpenseItem[]): number {
   if (!items || items.length === 0) return 0;

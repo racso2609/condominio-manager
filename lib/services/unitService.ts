@@ -1,13 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import { Unit } from "@/lib/types";
+import { generateId } from "@/lib/utils/id";
 
 const TABLE = "units";
-const ROLES_TABLE = "condominium_roles";
-const BUILDINGS_TABLE = "buildings";
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
 
 export function getUnitNumber(
   floor: number,

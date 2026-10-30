@@ -165,11 +165,33 @@ export default function ResidentsPage() {
   const [removingUnitId, setRemovingUnitId] = useState<string | null>(null);
   const [editingResident, setEditingResident] = useState<AppUser | null>(null);
   const [copiedResidentId, setCopiedResidentId] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   const handleCopySummary = (roleId: string, summaryText: string) => {
     navigator.clipboard.writeText(summaryText);
     setCopiedResidentId(roleId);
     setTimeout(() => setCopiedResidentId(null), 2500);
+  };
+
+  const isInviteExpired = (role: CondominiumRole) =>
+    !!role.expires_at && new Date(role.expires_at).getTime() < now;
+
+  const pendingInvites = useMemo(
+    () => roles.filter((r) => !r.user && r.token && !isInviteExpired(r)),
+    [roles, now]
+  );
+
+  const handleDeleteInvite = (roleId: string, emailOrLabel: string) => {
+    if (
+      !window.confirm(
+        `¿Eliminar la invitación para "${emailOrLabel}"? El enlace dejará de funcionar.`
+      )
+    ) {
+      return;
+    }
+    deleteCondominiumRole(roleId, {
+      onError: () => alert("Error al eliminar la invitación"),
+    });
   };
 
   const { mutate: rejectUnitClaim, isPending: rejecting } = useRejectUnitClaim();
@@ -988,6 +1010,70 @@ export default function ResidentsPage() {
               })}
             </div>
           )}
+        </section>
+      )}
+
+      {isCondoAdmin && pendingInvites.length > 0 && (
+        <section>
+          <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+            Invitaciones pendientes ({pendingInvites.length})
+          </h2>
+          <div className="flex flex-col gap-2">
+            {pendingInvites.map((r) => {
+              const label = r.invited_email ?? "Link grupal";
+              const tokenUrl = r.token
+                ? `${typeof window !== "undefined" ? window.location.origin : ""}/invite?token=${r.token}`
+                : "";
+
+              return (
+                <div
+                  key={r.id}
+                  className="flex items-center gap-4 rounded-xl border border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-black"
+                >
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                      {label}
+                    </p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {r.role === "administrator"
+                        ? "Encargado de torre"
+                        : "Residente"}{" "}
+                      ·{" "}
+                      {r.expires_at
+                        ? `Expira el ${new Date(r.expires_at).toLocaleDateString()}`
+                        : "Sin fecha de expiración"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {r.token && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="xs"
+                        onClick={() => {
+                          if (tokenUrl) {
+                            navigator.clipboard.writeText(tokenUrl);
+                            setCopiedResidentId(r.id);
+                            setTimeout(() => setCopiedResidentId(null), 2500);
+                          }
+                        }}
+                      >
+                        {copiedResidentId === r.id ? "✓ Copiado" : "Copiar link"}
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="xs"
+                      onClick={() => handleDeleteInvite(r.id, label)}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </section>
       )}
 

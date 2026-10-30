@@ -1,6 +1,16 @@
+# Database ID Rules & Standard
+
+- **Strict Type**: All Primary Keys (`id`) and Foreign Keys (`FK`) across all PostgreSQL tables must be **`UUID v4`**.
+- **Database Defaults**: All primary key columns must have `DEFAULT gen_random_uuid()`.
+- **TypeScript & Application Code**: When generating IDs in client/server code, import and use `generateId()` from `@/lib/utils/id` (which wraps `crypto.randomUUID()`).
+- **Embedded Sub-entities (JSONB)**: Line items (e.g. `expense.items[].id`) must also use standard UUID v4 strings.
+- **Tokens/Codes (Exceptions)**: `token` in `condominium_roles` is a random UUID string; external payment references (`payment_reference`) are plain text strings.
+
+---
+
 user:
 
-- id (PK)
+- id (PK, uuid)
 - name
 - email
 - role: admin | user | administrator
@@ -9,23 +19,23 @@ user:
 
 condominium:
 
-- id (PK)
+- id (PK, uuid)
 - name
 - address
-- creator (FK → user.id)
+- creator (FK → user.id, uuid)
 - status: "draft" | "complete"
 - created_at
 - updated_at
 
 condominium_roles:
 
-- id (PK)
-- condominium (FK → condominium.id)
-- user (FK → user.id)
+- id (PK, uuid)
+- condominium (FK → condominium.id, uuid)
+- user (FK → user.id, uuid)
 - role: "administrator" | "resident"
 - status: "pending" | "verified"
 - invited_email        -- email the invite was sent to
-- invited_by (FK → user.id)
+- invited_by (FK → user.id, uuid)
 - token                -- unique invite token
 - expires_at
 - created_at
@@ -33,8 +43,8 @@ condominium_roles:
 
 building:
 
-- id (PK)
-- condominium (FK → condominium.id)
+- id (PK, uuid)
+- condominium (FK → condominium.id, uuid)
 - name
 - symbol
 - address
@@ -43,31 +53,31 @@ building:
 
 unit:
 
-- id (PK)
-- building (FK → building.id)
+- id (PK, uuid)
+- building (FK → building.id, uuid)
 - num
 - floor
 - type: "residential" | "office"
-- owner (FK → user.id)
+- owner (FK → user.id, uuid)
 - aliquot (numeric, nullable) -- percentage 0-100, null = equal split
 - created_at
 - updated_at
 
 expense:
 
-- id (PK)
-- condominium (FK → condominium.id, nullable)
-- building (FK → building.id, nullable)
+- id (PK, uuid)
+- condominium (FK → condominium.id, uuid, nullable)
+- building (FK → building.id, uuid, nullable)
 - title
 - description
 - amount
-- items (JSONB, optional) -- array of `{ id, description, amount }` line items
+- items (JSONB, optional) -- array of `{ id, description, amount }` line items (id is UUID)
 - due_date
 - period_start
 - period_end
 - status: "active" | "cancelled"
 - deleted_at (timestamptz, optional)
-- deleted_by (FK → user.id, optional)
+- deleted_by (FK → user.id, uuid, optional)
 - delete_reason (optional)
 - created_at
 - updated_at
@@ -78,10 +88,10 @@ expense:
 
 announcement:
 
-- id (PK)
-- condominium (FK → condominium.id)
+- id (PK, uuid)
+- condominium (FK → condominium.id, uuid)
 - title
 - content
-- author (FK → user.id)
+- author (FK → user.id, uuid)
 - created_at
 - updated_at

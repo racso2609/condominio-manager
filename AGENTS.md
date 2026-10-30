@@ -35,7 +35,12 @@
 - `context/` — React context providers.
 - `hooks/` — custom hooks (`useHomeData.ts`).
 
-## Lint / type workflow
+## Database & ID Standard
+
+- **Strict UUID v4 Rule**: All Primary Keys (`id`) and Foreign Keys across all tables must be native `UUID v4` strings.
+- **Generation**: PostgreSQL schemas set `DEFAULT gen_random_uuid()`. TypeScript code uses `generateId()` from `@/lib/utils/id`.
+- **JSONB Sub-items**: Nested entity identifiers (such as line item IDs in `expenses.items`) must also use standard UUID v4.
+
 
 - No enforced ordering. In practice: `pnpm lint` then `pnpm build` (build runs TypeScript checks with `noEmit`).
 - `eslint.config.mjs` extends `eslint-config-next/core-web-vitals` and `typescript`; it explicitly ignores `.next/`, `out/`, `build/`, and `next-env.d.ts`.

@@ -1,13 +1,10 @@
 import { supabase } from "@/lib/supabase";
 import { Building, Unit } from "@/lib/types";
 import { getUnitsByBuilding } from "@/lib/services/unitService";
+import { generateId } from "@/lib/utils/id";
 
 const TABLE = "buildings";
 const UNITS_TABLE = "units";
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
 
 export async function createBuilding(data: {
   condominium: string;
