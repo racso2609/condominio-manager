@@ -362,10 +362,12 @@ export default function ResidentsPage() {
   const residentRoles = Object.values(
     roles
       .filter((r) => {
+        if (!r.user) return false;
         if (isCondoAdmin) return true;
         return (unitsByOwner[r.user]?.length ?? 0) > 0;
       })
       .reduce<Record<string, CondominiumRole>>((acc, r) => {
+        if (!r.user) return acc;
         const existing = acc[r.user];
         if (!existing || rankCondominiumRole(r) > rankCondominiumRole(existing)) {
           acc[r.user] = r;
