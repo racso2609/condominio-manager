@@ -50,6 +50,7 @@ export default function BuildingAliquotsPage() {
   }, [units, userValues]);
 
   const { canManageBuilding } = useCondominiumPermissions(condominiumId);
+  const batchUpdateMutation = useBatchUpdateAliquots();
 
   useEffect(() => {
     if (!buildingLoading && building === null) {
@@ -112,7 +113,7 @@ export default function BuildingAliquotsPage() {
       })
       .map((u) => ({ id: u.id, aliquot: parseAliquot(values[u.id]) }));
     if (updates.length === 0) return;
-    await batchUpdateAliquots(updates);
+    await batchUpdateMutation.mutateAsync(updates);
   };
 
   return (
@@ -217,11 +218,11 @@ export default function BuildingAliquotsPage() {
           <div className="flex gap-3">
             <Button
               onClick={handleSave}
-              disabled={saving || changedCount === 0}
+              disabled={batchUpdateMutation.isPending || changedCount === 0}
               variant="primary"
               size="lg"
             >
-              {saving ? "Guardando..." : "Guardar"}
+              {batchUpdateMutation.isPending ? "Guardando..." : "Guardar"}
             </Button>
             <Button
               href={`/condominium/${condominiumId}/buildings/${buildingId}`}
